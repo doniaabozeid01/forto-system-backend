@@ -1,0 +1,11 @@
+{
+  "Version": 1,
+  "Hash": "bHspZBuvCjQbLtfA65dWcpbGZDOohS9B+de9jNEaSjU=",
+  "Source": "Forto.Api",
+  "BasePath": "_content/Forto.Api",
+  "Mode": "Default",
+  "ManifestType": "Build",
+  "ReferencedProjectsConfiguration": [],
+  "DiscoveryPatterns": [],
+  "Assets": []
+}

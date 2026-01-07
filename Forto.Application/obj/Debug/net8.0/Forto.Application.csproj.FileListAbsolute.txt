@@ -1,0 +1,15 @@
+C:\Users\pc\faculty\FortoCarWash\Forto.Application\bin\Debug\net8.0\Forto.Application.deps.json
+C:\Users\pc\faculty\FortoCarWash\Forto.Application\bin\Debug\net8.0\Forto.Application.dll
+C:\Users\pc\faculty\FortoCarWash\Forto.Application\bin\Debug\net8.0\Forto.Application.pdb
+C:\Users\pc\faculty\FortoCarWash\Forto.Application\bin\Debug\net8.0\Forto.Domain.dll
+C:\Users\pc\faculty\FortoCarWash\Forto.Application\bin\Debug\net8.0\Forto.Domain.pdb
+C:\Users\pc\faculty\FortoCarWash\Forto.Application\obj\Debug\net8.0\Forto.Application.csproj.AssemblyReference.cache
+C:\Users\pc\faculty\FortoCarWash\Forto.Application\obj\Debug\net8.0\Forto.Application.GeneratedMSBuildEditorConfig.editorconfig
+C:\Users\pc\faculty\FortoCarWash\Forto.Application\obj\Debug\net8.0\Forto.Application.AssemblyInfoInputs.cache
+C:\Users\pc\faculty\FortoCarWash\Forto.Application\obj\Debug\net8.0\Forto.Application.AssemblyInfo.cs
+C:\Users\pc\faculty\FortoCarWash\Forto.Application\obj\Debug\net8.0\Forto.Application.csproj.CoreCompileInputs.cache
+C:\Users\pc\faculty\FortoCarWash\Forto.Application\obj\Debug\net8.0\Forto.Application.csproj.CopyComplete
+C:\Users\pc\faculty\FortoCarWash\Forto.Application\obj\Debug\net8.0\Forto.Application.dll
+C:\Users\pc\faculty\FortoCarWash\Forto.Application\obj\Debug\net8.0\refint\Forto.Application.dll
+C:\Users\pc\faculty\FortoCarWash\Forto.Application\obj\Debug\net8.0\Forto.Application.pdb
+C:\Users\pc\faculty\FortoCarWash\Forto.Application\obj\Debug\net8.0\ref\Forto.Application.dll
