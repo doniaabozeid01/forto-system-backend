@@ -4,6 +4,7 @@ using Forto.Infrastructure.Data;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Infrastructure;
 using Microsoft.EntityFrameworkCore.Metadata;
+using Microsoft.EntityFrameworkCore.Migrations;
 using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 
 #nullable disable
@@ -11,9 +12,11 @@ using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 namespace Forto.Infrastructure.Migrations
 {
     [DbContext(typeof(FortoDbContext))]
-    partial class FortoDbContextModelSnapshot : ModelSnapshot
+    [Migration("20260108202948_addCatalogAndCategories")]
+    partial class addCatalogAndCategories
     {
-        protected override void BuildModel(ModelBuilder modelBuilder)
+        /// <inheritdoc />
+        protected override void BuildTargetModel(ModelBuilder modelBuilder)
         {
 #pragma warning disable 612, 618
             modelBuilder
@@ -266,42 +269,6 @@ namespace Forto.Infrastructure.Migrations
                     b.ToTable("Employees", "hr");
                 });
 
-            modelBuilder.Entity("Forto.Domain.Entities.Employee.EmployeeService", b =>
-                {
-                    b.Property<int>("Id")
-                        .ValueGeneratedOnAdd()
-                        .HasColumnType("int");
-
-                    SqlServerPropertyBuilderExtensions.UseIdentityColumn(b.Property<int>("Id"));
-
-                    b.Property<DateTime>("CreatedAt")
-                        .HasColumnType("datetime2");
-
-                    b.Property<int>("EmployeeId")
-                        .HasColumnType("int");
-
-                    b.Property<bool>("IsActive")
-                        .HasColumnType("bit");
-
-                    b.Property<bool>("IsDeleted")
-                        .HasColumnType("bit");
-
-                    b.Property<int>("ServiceId")
-                        .HasColumnType("int");
-
-                    b.Property<DateTime?>("UpdatedAt")
-                        .HasColumnType("datetime2");
-
-                    b.HasKey("Id");
-
-                    b.HasIndex("ServiceId");
-
-                    b.HasIndex("EmployeeId", "ServiceId")
-                        .IsUnique();
-
-                    b.ToTable("EmployeeServices", "hr");
-                });
-
             modelBuilder.Entity("Forto.Domain.Entities.Employee.EmployeeWorkSchedule", b =>
                 {
                     b.Property<int>("Id")
@@ -421,25 +388,6 @@ namespace Forto.Infrastructure.Migrations
                     b.Navigation("Client");
                 });
 
-            modelBuilder.Entity("Forto.Domain.Entities.Employee.EmployeeService", b =>
-                {
-                    b.HasOne("Forto.Domain.Entities.Employee.Employee", "Employee")
-                        .WithMany("EmployeeServices")
-                        .HasForeignKey("EmployeeId")
-                        .OnDelete(DeleteBehavior.Cascade)
-                        .IsRequired();
-
-                    b.HasOne("Forto.Domain.Entities.Catalog.Service", "Service")
-                        .WithMany()
-                        .HasForeignKey("ServiceId")
-                        .OnDelete(DeleteBehavior.Cascade)
-                        .IsRequired();
-
-                    b.Navigation("Employee");
-
-                    b.Navigation("Service");
-                });
-
             modelBuilder.Entity("Forto.Domain.Entities.Employee.EmployeeWorkSchedule", b =>
                 {
                     b.HasOne("Forto.Domain.Entities.Employee.Employee", "Employee")
@@ -476,8 +424,6 @@ namespace Forto.Infrastructure.Migrations
 
             modelBuilder.Entity("Forto.Domain.Entities.Employee.Employee", b =>
                 {
-                    b.Navigation("EmployeeServices");
-
                     b.Navigation("WorkSchedules");
                 });
 

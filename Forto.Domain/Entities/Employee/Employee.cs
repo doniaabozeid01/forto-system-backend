@@ -14,6 +14,10 @@ namespace Forto.Domain.Entities.Employee
         public bool IsActive { get; set; } = true;
 
         public ICollection<EmployeeWorkSchedule> WorkSchedules { get; set; } = new List<EmployeeWorkSchedule>();
+
+        public ICollection<EmployeeService> EmployeeServices { get; set; } = new List<EmployeeService>();
+
+
     }
 
 }

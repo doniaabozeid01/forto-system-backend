@@ -5,17 +5,14 @@ using System.Linq;
 using System.Text;
 using System.Threading.Tasks;
 
-namespace Forto.Application.DTOs
+namespace Forto.Application.DTOs.Catalog.Categories
 {
-    public class CreateServiceRequest
+    public class UpdateCategoryRequest
     {
         [Required, MinLength(2)]
         public string Name { get; set; } = "";
 
-        [Range(1, 1000000)]
-        public decimal Price { get; set; }
-
-        [Range(1, 600)]
-        public int DurationMinutes { get; set; }
+        public int? ParentId { get; set; }
+        public bool IsActive { get; set; } = true;
     }
 }
