@@ -19,10 +19,6 @@ namespace Forto.Api.Controllers
         protected IActionResult FailResponse(string message, int statusCode = 400, Dictionary<string, string[]>? errors = null)
             => StatusCode(statusCode, ApiResponse<object>.Fail(message, errors, TraceId));
     }
-
-
-
-
 }
 
 

@@ -1,107 +1,180 @@
 
-//using Forto.Api.Common;
-//using Forto.Api.Middleware;
-//using Microsoft.AspNetCore.Mvc;
-
-//namespace Forto.Api
-//{
-//    public class Program
-//    {
-//        public static void Main(string[] args)
-//        {
-//            var builder = WebApplication.CreateBuilder(args);
-
-//            // Add services to the container.
-
-//            builder.Services.AddControllers();
-//            // Learn more about configuring Swagger/OpenAPI at https://aka.ms/aspnetcore/swashbuckle
-//            builder.Services.AddEndpointsApiExplorer();
-//            builder.Services.AddSwaggerGen();
-
-//            var app = builder.Build();
-
-//            // Configure the HTTP request pipeline.
-//            if (app.Environment.IsDevelopment())
-//            {
-//                app.UseSwagger();
-//                app.UseSwaggerUI();
-//            }
-
-//            app.UseHttpsRedirection();
-
-//            app.UseAuthorization();
-
-
-//            app.MapControllers();
-
-//            app.Run();
-//        }
-//    }
-//}
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
 using Forto.Api.Common;
 using Forto.Api.Middleware;
+using Forto.Application.Abstractions.Repositories;
+using Forto.Application.Abstractions.Services.Employees;
+using Forto.Application.Abstractions.Services.Schedule;
+using Forto.Application.Abstractions.Services.Shift;
+using Forto.Infrastructure.Data;
+using Forto.Infrastructure.UnitOfWork;
 using Microsoft.AspNetCore.Mvc;
+using Microsoft.EntityFrameworkCore;
+using Microsoft.EntityFrameworkCore.Migrations;
 
-var builder = WebApplication.CreateBuilder(args);
-
-// Logging (????????? ???? ??????)
-// builder.Logging.ClearProviders(); // ???????
-// builder.Logging.AddConsole();     // ???? ?????? ????????
-
-builder.Services.AddControllers()
-    .ConfigureApiBehaviorOptions(options =>
+namespace Forto.Api
+{
+    public class Program
     {
-        options.InvalidModelStateResponseFactory = context =>
+        public static void Main(string[] args)
         {
-            var errors = context.ModelState
-                .Where(x => x.Value?.Errors.Count > 0)
-                .ToDictionary(
-                    k => k.Key,
-                    v => v.Value!.Errors.Select(e => e.ErrorMessage).ToArray()
-                );
+            var builder = WebApplication.CreateBuilder(args);
 
-            var traceId = context.HttpContext.TraceIdentifier;
 
-            var response = ApiResponse<object>.Fail(
-                message: "Validation failed",
-                errors: errors,
-                traceId: traceId
-            );
 
-            return new BadRequestObjectResult(response);
-        };
-    });
+            builder.Services.AddControllers()
+                .AddJsonOptions(options =>
+                {
+                    options.JsonSerializerOptions.Converters.Add(new TimeOnlyJsonConverter());
+                })
+                .ConfigureApiBehaviorOptions(options =>
+            {
+                options.InvalidModelStateResponseFactory = context =>
+                {
+                    var errors = context.ModelState
+                        .Where(x => x.Value?.Errors.Count > 0)
+                        .ToDictionary(
+                            k => k.Key,
+                            v => v.Value!.Errors
+                            .Select(e =>
+                                !string.IsNullOrWhiteSpace(e.ErrorMessage)
+                                    ? e.ErrorMessage
+                                    : (e.Exception?.Message ?? "Invalid value"))
+                            .ToArray()
 
-builder.Services.AddEndpointsApiExplorer();
-builder.Services.AddSwaggerGen();
+                        );
 
-// Middleware registration
-builder.Services.AddTransient<ExceptionHandlingMiddleware>();
+                    var traceId = context.HttpContext.TraceIdentifier;
 
-var app = builder.Build();
+                    var response = ApiResponse<object>.Fail(
+                        message: "Validation failed",
+                        errors: errors,
+                        traceId: traceId
+                    );
 
-app.UseSwagger();
-app.UseSwaggerUI();
+                    return new BadRequestObjectResult(response);
+                };
+            });
 
-app.UseMiddleware<ExceptionHandlingMiddleware>();
 
-app.MapControllers();
-app.Run();
+
+            // Add services to the container.
+            builder.Services.AddDbContext<FortoDbContext>(options =>
+            {
+                options.UseSqlServer(builder.Configuration.GetConnectionString("DefaultConnection"));
+            });
+
+            builder.Services.AddScoped<IUnitOfWork, UnitOfWork>();
+            builder.Services.AddScoped<IShiftService, ShiftService>();
+            builder.Services.AddScoped<IEmployeeService, EmployeeService>();
+            builder.Services.AddScoped<IEmployeeScheduleService, EmployeeScheduleService>();
+
+
+            // Learn more about configuring Swagger/OpenAPI at https://aka.ms/aspnetcore/swashbuckle
+            builder.Services.AddEndpointsApiExplorer();
+            builder.Services.AddSwaggerGen();
+
+            // Middleware registration
+            builder.Services.AddTransient<ExceptionHandlingMiddleware>();
+
+            var app = builder.Build();
+
+            // Configure the HTTP request pipeline.
+            if (app.Environment.IsDevelopment())
+            {
+                app.UseSwagger();
+                app.UseSwaggerUI();
+            }
+
+            app.UseHttpsRedirection();
+
+            app.UseAuthorization();
+
+
+            app.UseMiddleware<ExceptionHandlingMiddleware>();
+
+
+            app.MapControllers();
+
+            app.Run();
+        }
+    }
+}
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+//using Forto.Api.Common;
+//using Forto.Api.Middleware;
+//using Forto.Application.Abstractions.Repositories;
+//using Forto.Infrastructure.Data;
+//using Forto.Infrastructure.UnitOfWork;
+//using Microsoft.AspNetCore.Mvc;
+
+//var builder = WebApplication.CreateBuilder(args);
+
+//// Logging (????????? ???? ??????)
+//// builder.Logging.ClearProviders(); // ???????
+//// builder.Logging.AddConsole();     // ???? ?????? ????????
+
+
+//builder.Services.AddDbContext<FortoDbContext>(options =>
+//{
+//    options.UseSqlServer(builder.Configuration.GetConnectionString("DefaultConnection"));
+//});
+
+//builder.Services.AddScoped<IUnitOfWork, UnitOfWork>();
+
+
+//builder.Services.AddControllers()
+//    .ConfigureApiBehaviorOptions(options =>
+//    {
+//        options.InvalidModelStateResponseFactory = context =>
+//        {
+//            var errors = context.ModelState
+//                .Where(x => x.Value?.Errors.Count > 0)
+//                .ToDictionary(
+//                    k => k.Key,
+//                    v => v.Value!.Errors.Select(e => e.ErrorMessage).ToArray()
+//                );
+
+//            var traceId = context.HttpContext.TraceIdentifier;
+
+//            var response = ApiResponse<object>.Fail(
+//                message: "Validation failed",
+//                errors: errors,
+//                traceId: traceId
+//            );
+
+//            return new BadRequestObjectResult(response);
+//        };
+//    });
+
+//builder.Services.AddEndpointsApiExplorer();
+//builder.Services.AddSwaggerGen();
+
+//// Middleware registration
+//builder.Services.AddTransient<ExceptionHandlingMiddleware>();
+
+//var app = builder.Build();
+
+//app.UseSwagger();
+//app.UseSwaggerUI();
+
+//app.UseMiddleware<ExceptionHandlingMiddleware>();
+
+//app.MapControllers();
+//app.Run();

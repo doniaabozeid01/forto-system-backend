@@ -19,6 +19,23 @@ namespace Forto.Api.Middleware
             {
                 await next(context);
             }
+
+            catch (BusinessException ex)
+            {
+                var traceId = context.TraceIdentifier;
+
+                context.Response.ContentType = "application/json";
+                context.Response.StatusCode = ex.StatusCode;
+
+                var payload = ApiResponse<object>.Fail(
+                    message: ex.Message,
+                    errors: ex.Errors,
+                    traceId: traceId
+                );
+
+                await context.Response.WriteAsync(JsonSerializer.Serialize(payload));
+                return;
+            }
             catch (Exception ex)
             {
                 var traceId = context.TraceIdentifier;
@@ -37,6 +54,8 @@ namespace Forto.Api.Middleware
                 await context.Response.WriteAsync(JsonSerializer.Serialize(payload));
             }
         }
+    
+    
     }
 
 }
