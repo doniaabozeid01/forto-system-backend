@@ -6,7 +6,7 @@ using System.Threading.Tasks;
 using Forto.Api.Common;
 using Forto.Application.Abstractions.Repositories;
 using Forto.Application.DTOs.Schedule;
-using Forto.Domain.Entities.Employee;
+using Forto.Domain.Entities.Employees;
 
 namespace Forto.Application.Abstractions.Services.Schedule
 {
@@ -28,14 +28,14 @@ namespace Forto.Application.Abstractions.Services.Schedule
                 throw new BusinessException("Employee not found", 404);
 
             var scheduleRepo = _uow.Repository<EmployeeWorkSchedule>();
-            var shiftRepo = _uow.Repository<Domain.Entities.Employee.Shift>();
+            var shiftRepo = _uow.Repository<Domain.Entities.Employees.Shift>();
 
             var schedules = await scheduleRepo.FindAsync(x => x.EmployeeId == employeeId);
 
             // نجيب الشيفتات المطلوبة مرة واحدة
             var shiftIds = schedules.Where(s => s.ShiftId.HasValue).Select(s => s.ShiftId!.Value).Distinct().ToList();
             var shifts = shiftIds.Count == 0
-                ? new List<Domain.Entities.Employee.Shift>()
+                ? new List<Domain.Entities.Employees.Shift>()
                 : (await shiftRepo.FindAsync(s => shiftIds.Contains(s.Id))).ToList();
 
             var shiftMap = shifts.ToDictionary(s => s.Id, s => s);
@@ -94,7 +94,7 @@ namespace Forto.Application.Abstractions.Services.Schedule
                     });
 
             var scheduleRepo = _uow.Repository<EmployeeWorkSchedule>();
-            var shiftRepo = _uow.Repository<Domain.Entities.Employee.Shift>();
+            var shiftRepo = _uow.Repository<Domain.Entities.Employees.Shift>();
 
             // 3) validate shift ids موجودة
             var requestedShiftIds = request.Days.Where(d => d.ShiftId.HasValue).Select(d => d.ShiftId!.Value).Distinct().ToList();

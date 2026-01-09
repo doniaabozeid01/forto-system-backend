@@ -13,7 +13,6 @@ namespace Forto.Application.Abstractions.Services.Catalogs.Service
         Task<ServiceResponse> CreateServiceAsync(CreateServiceRequest request);
         Task<ServiceResponse?> GetServiceAsync(int id);
         Task<IReadOnlyList<ServiceResponse>> GetServicesAsync(int? categoryId = null);
-
         Task<ServiceResponse?> UpsertRatesAsync(int serviceId, UpsertServiceRatesRequest request);
         Task<bool> DeleteServiceAsync(int id);
         Task<IReadOnlyList<EmployeeResponse>> GetEmployeesForServiceAsync(int serviceId);

@@ -2,12 +2,15 @@
 using Forto.Api.Common;
 using Forto.Api.Middleware;
 using Forto.Application.Abstractions.Repositories;
+using Forto.Application.Abstractions.Services.Bookings;
 using Forto.Application.Abstractions.Services.Cars;
 using Forto.Application.Abstractions.Services.Catalogs.Categories;
 using Forto.Application.Abstractions.Services.Catalogs.Service;
 using Forto.Application.Abstractions.Services.Clients;
 using Forto.Application.Abstractions.Services.Employees;
+using Forto.Application.Abstractions.Services.Employees.Tasks;
 using Forto.Application.Abstractions.Services.EmployeeServices;
+using Forto.Application.Abstractions.Services.Invoices;
 using Forto.Application.Abstractions.Services.Schedule;
 using Forto.Application.Abstractions.Services.Shift;
 using Forto.Infrastructure.Data;
@@ -77,6 +80,11 @@ namespace Forto.Api
             builder.Services.AddScoped<ICatalogService, CatalogService>();
             builder.Services.AddScoped<ICategoryService, CategoryService>();
             builder.Services.AddScoped<IEmployeeCapabilityService, EmployeeCapabilityService>();
+            builder.Services.AddScoped<IBookingService, BookingService>();
+            builder.Services.AddScoped<IEmployeeTaskService, EmployeeTaskService>();
+            builder.Services.AddScoped<IInvoiceService, InvoiceService>();
+            // ? BookingService ???? ????? InvoiceService
+            builder.Services.AddScoped<IBookingService, BookingService>();
 
 
             // Learn more about configuring Swagger/OpenAPI at https://aka.ms/aspnetcore/swashbuckle

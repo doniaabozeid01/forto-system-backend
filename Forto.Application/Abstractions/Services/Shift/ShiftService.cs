@@ -6,7 +6,7 @@ using System.Threading.Tasks;
 using Forto.Api.Common;
 using Forto.Application.Abstractions.Repositories;
 using Forto.Application.DTOs.Shifts;
-using Forto.Domain.Entities.Employee;
+using Forto.Domain.Entities.Employees;
 
 namespace Forto.Application.Abstractions.Services.Shift
 {
@@ -34,9 +34,9 @@ namespace Forto.Application.Abstractions.Services.Shift
                 );
             }
 
-            var repo = _uow.Repository<Domain.Entities.Employee.Shift>();
+            var repo = _uow.Repository<Domain.Entities.Employees.Shift>();
 
-            var shift = new Domain.Entities.Employee.Shift
+            var shift = new Domain.Entities.Employees.Shift
             {
                 Name = request.Name.Trim(),
                 StartTime = request.StartTime,
@@ -57,7 +57,7 @@ namespace Forto.Application.Abstractions.Services.Shift
 
         public async Task<IReadOnlyList<ShiftResponse>> GetAllAsync()
         {
-            var repo = _uow.Repository<Domain.Entities.Employee.Shift>();
+            var repo = _uow.Repository<Domain.Entities.Employees.Shift>();
             var shifts = await repo.GetAllAsync();
 
             return shifts.Select(s => new ShiftResponse
@@ -71,7 +71,7 @@ namespace Forto.Application.Abstractions.Services.Shift
 
         public async Task<ShiftResponse?> GetByIdAsync(int id)
         {
-            var repo = _uow.Repository<Domain.Entities.Employee.Shift>();
+            var repo = _uow.Repository<Domain.Entities.Employees.Shift>();
             var s = await repo.GetByIdAsync(id);
             if (s == null) return null;
 
@@ -86,7 +86,7 @@ namespace Forto.Application.Abstractions.Services.Shift
 
         public async Task<bool> DeleteAsync(int id)
         {
-            var repo = _uow.Repository<Domain.Entities.Employee.Shift>();
+            var repo = _uow.Repository<Domain.Entities.Employees.Shift>();
             var s = await repo.GetByIdAsync(id);
             if (s == null) return false;
 
@@ -104,7 +104,7 @@ namespace Forto.Application.Abstractions.Services.Shift
             if (request.EndTime == request.StartTime)
                 throw new Exception("Shift time range is invalid");
 
-            var repo = _uow.Repository<Domain.Entities.Employee.Shift>();
+            var repo = _uow.Repository<Domain.Entities.Employees.Shift>();
             var shift = await repo.GetByIdAsync(id);
             if (shift == null) return null;
 

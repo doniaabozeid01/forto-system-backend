@@ -22,6 +22,213 @@ namespace Forto.Infrastructure.Migrations
 
             SqlServerModelBuilderExtensions.UseIdentityColumns(modelBuilder);
 
+            modelBuilder.Entity("Forto.Domain.Entities.Billings.Invoice", b =>
+                {
+                    b.Property<int>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("int");
+
+                    SqlServerPropertyBuilderExtensions.UseIdentityColumn(b.Property<int>("Id"));
+
+                    b.Property<int>("BookingId")
+                        .HasColumnType("int");
+
+                    b.Property<DateTime>("CreatedAt")
+                        .HasColumnType("datetime2");
+
+                    b.Property<decimal>("Discount")
+                        .HasColumnType("decimal(18,2)");
+
+                    b.Property<bool>("IsDeleted")
+                        .HasColumnType("bit");
+
+                    b.Property<DateTime?>("PaidAt")
+                        .HasColumnType("datetime2");
+
+                    b.Property<int?>("PaidByEmployeeId")
+                        .HasColumnType("int");
+
+                    b.Property<int?>("PaymentMethod")
+                        .HasColumnType("int");
+
+                    b.Property<int>("Status")
+                        .HasColumnType("int");
+
+                    b.Property<decimal>("SubTotal")
+                        .HasColumnType("decimal(18,2)");
+
+                    b.Property<decimal>("Total")
+                        .HasColumnType("decimal(18,2)");
+
+                    b.Property<DateTime?>("UpdatedAt")
+                        .HasColumnType("datetime2");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("BookingId")
+                        .IsUnique();
+
+                    b.ToTable("Invoices", "billing");
+                });
+
+            modelBuilder.Entity("Forto.Domain.Entities.Billings.InvoiceLine", b =>
+                {
+                    b.Property<int>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("int");
+
+                    SqlServerPropertyBuilderExtensions.UseIdentityColumn(b.Property<int>("Id"));
+
+                    b.Property<DateTime>("CreatedAt")
+                        .HasColumnType("datetime2");
+
+                    b.Property<string>("Description")
+                        .IsRequired()
+                        .HasColumnType("nvarchar(max)");
+
+                    b.Property<int>("InvoiceId")
+                        .HasColumnType("int");
+
+                    b.Property<bool>("IsDeleted")
+                        .HasColumnType("bit");
+
+                    b.Property<int>("Qty")
+                        .HasColumnType("int");
+
+                    b.Property<decimal>("Total")
+                        .HasColumnType("decimal(18,2)");
+
+                    b.Property<decimal>("UnitPrice")
+                        .HasColumnType("decimal(18,2)");
+
+                    b.Property<DateTime?>("UpdatedAt")
+                        .HasColumnType("datetime2");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("InvoiceId");
+
+                    b.ToTable("InvoiceLines", "billing");
+                });
+
+            modelBuilder.Entity("Forto.Domain.Entities.Bookings.Booking", b =>
+                {
+                    b.Property<int>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("int");
+
+                    SqlServerPropertyBuilderExtensions.UseIdentityColumn(b.Property<int>("Id"));
+
+                    b.Property<int>("BranchId")
+                        .HasColumnType("int");
+
+                    b.Property<int>("CarId")
+                        .HasColumnType("int");
+
+                    b.Property<int>("ClientId")
+                        .HasColumnType("int");
+
+                    b.Property<DateTime?>("CompletedAt")
+                        .HasColumnType("datetime2");
+
+                    b.Property<DateTime>("CreatedAt")
+                        .HasColumnType("datetime2");
+
+                    b.Property<int>("EstimatedDurationMinutes")
+                        .HasColumnType("int");
+
+                    b.Property<bool>("IsDeleted")
+                        .HasColumnType("bit");
+
+                    b.Property<string>("Notes")
+                        .HasColumnType("nvarchar(max)");
+
+                    b.Property<DateTime>("ScheduledStart")
+                        .HasColumnType("datetime2");
+
+                    b.Property<DateTime>("SlotHourStart")
+                        .HasColumnType("datetime2");
+
+                    b.Property<int>("Status")
+                        .HasColumnType("int");
+
+                    b.Property<decimal>("TotalPrice")
+                        .HasColumnType("decimal(18,2)");
+
+                    b.Property<DateTime?>("UpdatedAt")
+                        .HasColumnType("datetime2");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("CarId");
+
+                    b.HasIndex("ClientId");
+
+                    b.HasIndex("BranchId", "SlotHourStart");
+
+                    b.ToTable("Bookings", "booking");
+                });
+
+            modelBuilder.Entity("Forto.Domain.Entities.Bookings.BookingItem", b =>
+                {
+                    b.Property<int>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("int");
+
+                    SqlServerPropertyBuilderExtensions.UseIdentityColumn(b.Property<int>("Id"));
+
+                    b.Property<int?>("AssignedEmployeeId")
+                        .HasColumnType("int");
+
+                    b.Property<int>("BodyType")
+                        .HasColumnType("int");
+
+                    b.Property<int>("BookingId")
+                        .HasColumnType("int");
+
+                    b.Property<DateTime?>("CompletedAt")
+                        .HasColumnType("datetime2");
+
+                    b.Property<DateTime>("CreatedAt")
+                        .HasColumnType("datetime2");
+
+                    b.Property<int>("DurationMinutes")
+                        .HasColumnType("int");
+
+                    b.Property<bool>("IsDeleted")
+                        .HasColumnType("bit");
+
+                    b.Property<byte[]>("RowVersion")
+                        .IsConcurrencyToken()
+                        .ValueGeneratedOnAddOrUpdate()
+                        .HasColumnType("rowversion");
+
+                    b.Property<int>("ServiceId")
+                        .HasColumnType("int");
+
+                    b.Property<DateTime?>("StartedAt")
+                        .HasColumnType("datetime2");
+
+                    b.Property<int>("Status")
+                        .HasColumnType("int");
+
+                    b.Property<decimal>("UnitPrice")
+                        .HasColumnType("decimal(18,2)");
+
+                    b.Property<DateTime?>("UpdatedAt")
+                        .HasColumnType("datetime2");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("AssignedEmployeeId");
+
+                    b.HasIndex("BookingId");
+
+                    b.HasIndex("ServiceId");
+
+                    b.ToTable("BookingItems", "booking");
+                });
+
             modelBuilder.Entity("Forto.Domain.Entities.Catalog.Category", b =>
                 {
                     b.Property<int>("Id")
@@ -230,7 +437,7 @@ namespace Forto.Infrastructure.Migrations
                     b.ToTable("Clients", "crm");
                 });
 
-            modelBuilder.Entity("Forto.Domain.Entities.Employee.Employee", b =>
+            modelBuilder.Entity("Forto.Domain.Entities.Employees.Employee", b =>
                 {
                     b.Property<int>("Id")
                         .ValueGeneratedOnAdd()
@@ -258,6 +465,9 @@ namespace Forto.Infrastructure.Migrations
                         .IsRequired()
                         .HasColumnType("nvarchar(max)");
 
+                    b.Property<int>("Role")
+                        .HasColumnType("int");
+
                     b.Property<DateTime?>("UpdatedAt")
                         .HasColumnType("datetime2");
 
@@ -266,7 +476,7 @@ namespace Forto.Infrastructure.Migrations
                     b.ToTable("Employees", "hr");
                 });
 
-            modelBuilder.Entity("Forto.Domain.Entities.Employee.EmployeeService", b =>
+            modelBuilder.Entity("Forto.Domain.Entities.Employees.EmployeeService", b =>
                 {
                     b.Property<int>("Id")
                         .ValueGeneratedOnAdd()
@@ -302,7 +512,7 @@ namespace Forto.Infrastructure.Migrations
                     b.ToTable("EmployeeServices", "hr");
                 });
 
-            modelBuilder.Entity("Forto.Domain.Entities.Employee.EmployeeWorkSchedule", b =>
+            modelBuilder.Entity("Forto.Domain.Entities.Employees.EmployeeWorkSchedule", b =>
                 {
                     b.Property<int>("Id")
                         .ValueGeneratedOnAdd()
@@ -347,7 +557,7 @@ namespace Forto.Infrastructure.Migrations
                     b.ToTable("EmployeeWorkSchedules", "hr");
                 });
 
-            modelBuilder.Entity("Forto.Domain.Entities.Employee.Shift", b =>
+            modelBuilder.Entity("Forto.Domain.Entities.Employees.Shift", b =>
                 {
                     b.Property<int>("Id")
                         .ValueGeneratedOnAdd()
@@ -377,6 +587,112 @@ namespace Forto.Infrastructure.Migrations
                     b.HasKey("Id");
 
                     b.ToTable("Shifts", "hr");
+                });
+
+            modelBuilder.Entity("Forto.Domain.Entities.Ops.Branch", b =>
+                {
+                    b.Property<int>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("int");
+
+                    SqlServerPropertyBuilderExtensions.UseIdentityColumn(b.Property<int>("Id"));
+
+                    b.Property<int>("CapacityPerHour")
+                        .HasColumnType("int");
+
+                    b.Property<DateTime>("CreatedAt")
+                        .HasColumnType("datetime2");
+
+                    b.Property<bool>("IsActive")
+                        .HasColumnType("bit");
+
+                    b.Property<bool>("IsDeleted")
+                        .HasColumnType("bit");
+
+                    b.Property<string>("Name")
+                        .IsRequired()
+                        .HasColumnType("nvarchar(max)");
+
+                    b.Property<DateTime?>("UpdatedAt")
+                        .HasColumnType("datetime2");
+
+                    b.HasKey("Id");
+
+                    b.ToTable("Branches", "ops");
+                });
+
+            modelBuilder.Entity("Forto.Domain.Entities.Billings.Invoice", b =>
+                {
+                    b.HasOne("Forto.Domain.Entities.Bookings.Booking", "Booking")
+                        .WithMany()
+                        .HasForeignKey("BookingId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.Navigation("Booking");
+                });
+
+            modelBuilder.Entity("Forto.Domain.Entities.Billings.InvoiceLine", b =>
+                {
+                    b.HasOne("Forto.Domain.Entities.Billings.Invoice", "Invoice")
+                        .WithMany("Lines")
+                        .HasForeignKey("InvoiceId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.Navigation("Invoice");
+                });
+
+            modelBuilder.Entity("Forto.Domain.Entities.Bookings.Booking", b =>
+                {
+                    b.HasOne("Forto.Domain.Entities.Ops.Branch", "Branch")
+                        .WithMany()
+                        .HasForeignKey("BranchId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
+                    b.HasOne("Forto.Domain.Entities.Clients.Car", "Car")
+                        .WithMany()
+                        .HasForeignKey("CarId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
+                    b.HasOne("Forto.Domain.Entities.Clients.Client", "Client")
+                        .WithMany()
+                        .HasForeignKey("ClientId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
+                    b.Navigation("Branch");
+
+                    b.Navigation("Car");
+
+                    b.Navigation("Client");
+                });
+
+            modelBuilder.Entity("Forto.Domain.Entities.Bookings.BookingItem", b =>
+                {
+                    b.HasOne("Forto.Domain.Entities.Employees.Employee", "AssignedEmployee")
+                        .WithMany()
+                        .HasForeignKey("AssignedEmployeeId");
+
+                    b.HasOne("Forto.Domain.Entities.Bookings.Booking", "Booking")
+                        .WithMany("Items")
+                        .HasForeignKey("BookingId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.HasOne("Forto.Domain.Entities.Catalog.Service", "Service")
+                        .WithMany()
+                        .HasForeignKey("ServiceId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.Navigation("AssignedEmployee");
+
+                    b.Navigation("Booking");
+
+                    b.Navigation("Service");
                 });
 
             modelBuilder.Entity("Forto.Domain.Entities.Catalog.Category", b =>
@@ -421,9 +737,9 @@ namespace Forto.Infrastructure.Migrations
                     b.Navigation("Client");
                 });
 
-            modelBuilder.Entity("Forto.Domain.Entities.Employee.EmployeeService", b =>
+            modelBuilder.Entity("Forto.Domain.Entities.Employees.EmployeeService", b =>
                 {
-                    b.HasOne("Forto.Domain.Entities.Employee.Employee", "Employee")
+                    b.HasOne("Forto.Domain.Entities.Employees.Employee", "Employee")
                         .WithMany("EmployeeServices")
                         .HasForeignKey("EmployeeId")
                         .OnDelete(DeleteBehavior.Cascade)
@@ -440,21 +756,31 @@ namespace Forto.Infrastructure.Migrations
                     b.Navigation("Service");
                 });
 
-            modelBuilder.Entity("Forto.Domain.Entities.Employee.EmployeeWorkSchedule", b =>
+            modelBuilder.Entity("Forto.Domain.Entities.Employees.EmployeeWorkSchedule", b =>
                 {
-                    b.HasOne("Forto.Domain.Entities.Employee.Employee", "Employee")
+                    b.HasOne("Forto.Domain.Entities.Employees.Employee", "Employee")
                         .WithMany("WorkSchedules")
                         .HasForeignKey("EmployeeId")
                         .OnDelete(DeleteBehavior.Cascade)
                         .IsRequired();
 
-                    b.HasOne("Forto.Domain.Entities.Employee.Shift", "Shift")
+                    b.HasOne("Forto.Domain.Entities.Employees.Shift", "Shift")
                         .WithMany("EmployeeSchedules")
                         .HasForeignKey("ShiftId");
 
                     b.Navigation("Employee");
 
                     b.Navigation("Shift");
+                });
+
+            modelBuilder.Entity("Forto.Domain.Entities.Billings.Invoice", b =>
+                {
+                    b.Navigation("Lines");
+                });
+
+            modelBuilder.Entity("Forto.Domain.Entities.Bookings.Booking", b =>
+                {
+                    b.Navigation("Items");
                 });
 
             modelBuilder.Entity("Forto.Domain.Entities.Catalog.Category", b =>
@@ -474,14 +800,14 @@ namespace Forto.Infrastructure.Migrations
                     b.Navigation("Cars");
                 });
 
-            modelBuilder.Entity("Forto.Domain.Entities.Employee.Employee", b =>
+            modelBuilder.Entity("Forto.Domain.Entities.Employees.Employee", b =>
                 {
                     b.Navigation("EmployeeServices");
 
                     b.Navigation("WorkSchedules");
                 });
 
-            modelBuilder.Entity("Forto.Domain.Entities.Employee.Shift", b =>
+            modelBuilder.Entity("Forto.Domain.Entities.Employees.Shift", b =>
                 {
                     b.Navigation("EmployeeSchedules");
                 });

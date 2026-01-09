@@ -4,10 +4,14 @@ using System.Linq;
 using System.Reflection.Emit;
 using System.Text;
 using System.Threading.Tasks;
+using Forto.Application.Abstractions.Services.Employees;
 using Forto.Domain.Entities;
+using Forto.Domain.Entities.Billings;
+using Forto.Domain.Entities.Bookings;
 using Forto.Domain.Entities.Catalog;
 using Forto.Domain.Entities.Clients;
-using Forto.Domain.Entities.Employee;
+using Forto.Domain.Entities.Employees;
+using Forto.Domain.Entities.Ops;
 using Microsoft.EntityFrameworkCore;
 
 namespace Forto.Infrastructure.Data
@@ -100,26 +104,120 @@ namespace Forto.Infrastructure.Data
                 .HasCheckConstraint("CK_ServiceRates_DurationMinutes", "[DurationMinutes] > 0");
 
 
-            modelBuilder.Entity<EmployeeService>().ToTable("EmployeeServices", "hr");
+            modelBuilder.Entity<Domain.Entities.Employees.EmployeeService>().ToTable("EmployeeServices", "hr");
 
             //modelBuilder.Entity<EmployeeService>()
             //    .HasKey(x => new { x.EmployeeId, x.ServiceId });
-            modelBuilder.Entity<EmployeeService>()
+            modelBuilder.Entity<Domain.Entities.Employees.EmployeeService>()
                 .HasIndex(x => new { x.EmployeeId, x.ServiceId })
                 .IsUnique();
 
 
-            modelBuilder.Entity<EmployeeService>()
+            modelBuilder.Entity<Domain.Entities.Employees.EmployeeService>()
                 .HasOne(x => x.Employee)
                 .WithMany(e => e.EmployeeServices)
                 .HasForeignKey(x => x.EmployeeId)
                 .OnDelete(DeleteBehavior.Cascade);
 
-            modelBuilder.Entity<EmployeeService>()
+            modelBuilder.Entity<Domain.Entities.Employees.EmployeeService>()
                 .HasOne(x => x.Service)
                 .WithMany() // مش لازم navigation في Service دلوقتي
                 .HasForeignKey(x => x.ServiceId)
                 .OnDelete(DeleteBehavior.Cascade);
+
+
+
+
+
+
+
+            modelBuilder.Entity<Branch>().ToTable("Branches", "ops");
+
+            modelBuilder.Entity<Booking>().ToTable("Bookings", "booking");
+            modelBuilder.Entity<BookingItem>().ToTable("BookingItems", "booking");
+
+            modelBuilder.Entity<Booking>()
+                .HasIndex(x => new { x.BranchId, x.SlotHourStart }); // مهم للبحث
+
+            modelBuilder.Entity<BookingItem>()
+                .Property(x => x.BodyType)
+                .HasConversion<int>();
+
+            modelBuilder.Entity<Booking>()
+                .Property(x => x.Status)
+                .HasConversion<int>();
+
+            modelBuilder.Entity<BookingItem>()
+                .Property(x => x.Status)
+                .HasConversion<int>();
+
+            modelBuilder.Entity<BookingItem>()
+                .Property(x => x.RowVersion)
+                .IsRowVersion();
+
+
+            modelBuilder.Entity<Booking>()
+                .HasMany(x => x.Items)
+                .WithOne(x => x.Booking)
+                .HasForeignKey(x => x.BookingId)
+                .OnDelete(DeleteBehavior.Cascade);
+
+
+            modelBuilder.Entity<Booking>()
+    .HasOne(b => b.Client)
+    .WithMany()
+    .HasForeignKey(b => b.ClientId)
+    .OnDelete(DeleteBehavior.Restrict); // أو NoAction
+
+            modelBuilder.Entity<Booking>()
+                .HasOne(b => b.Car)
+                .WithMany()
+                .HasForeignKey(b => b.CarId)
+                .OnDelete(DeleteBehavior.Restrict);
+
+            modelBuilder.Entity<Booking>()
+                .HasOne(b => b.Branch)
+                .WithMany()
+                .HasForeignKey(b => b.BranchId)
+                .OnDelete(DeleteBehavior.Restrict);
+
+            // وده نخليه Cascade عادي
+            modelBuilder.Entity<Booking>()
+                .HasMany(b => b.Items)
+                .WithOne(i => i.Booking)
+                .HasForeignKey(i => i.BookingId)
+                .OnDelete(DeleteBehavior.Cascade);
+
+
+            modelBuilder.Entity<Employee>()
+                .Property(x => x.Role)
+                .HasConversion<int>();
+
+
+
+
+
+            modelBuilder.Entity<Invoice>().ToTable("Invoices", "billing");
+            modelBuilder.Entity<InvoiceLine>().ToTable("InvoiceLines", "billing");
+
+            modelBuilder.Entity<Invoice>()
+                .Property(x => x.Status)
+                .HasConversion<int>();
+
+            modelBuilder.Entity<Invoice>()
+                .Property(x => x.PaymentMethod)
+                .HasConversion<int?>();
+
+            modelBuilder.Entity<Invoice>()
+                .HasIndex(x => x.BookingId)
+                .IsUnique(); // Invoice واحدة لكل booking
+
+            modelBuilder.Entity<Invoice>()
+                .HasMany(x => x.Lines)
+                .WithOne(x => x.Invoice)
+                .HasForeignKey(x => x.InvoiceId)
+                .OnDelete(DeleteBehavior.Cascade);
+
 
 
         }

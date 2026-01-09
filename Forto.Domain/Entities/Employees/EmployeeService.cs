@@ -5,7 +5,7 @@ using System.Linq;
 using System.Text;
 using System.Threading.Tasks;
 
-namespace Forto.Domain.Entities.Employee
+namespace Forto.Domain.Entities.Employees
 {
     public class EmployeeService : BaseEntity
     {

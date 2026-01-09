@@ -2,7 +2,7 @@
 using Forto.Application.Abstractions.Repositories;
 using Forto.Application.DTOs.Employees.EmployeeServices;
 using Forto.Domain.Entities.Catalog;
-using Forto.Domain.Entities.Employee;
+using Forto.Domain.Entities.Employees;
 using System;
 using System.Collections.Generic;
 using System.Linq;

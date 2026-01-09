@@ -1,4 +1,5 @@
 ﻿using Forto.Api.Common;
+using Microsoft.EntityFrameworkCore;
 using System.Net;
 using System.Text.Json;
 
@@ -30,6 +31,20 @@ namespace Forto.Api.Middleware
                 var payload = ApiResponse<object>.Fail(
                     message: ex.Message,
                     errors: ex.Errors,
+                    traceId: traceId
+                );
+
+                await context.Response.WriteAsync(JsonSerializer.Serialize(payload));
+                return;
+            }
+            catch (DbUpdateConcurrencyException)
+{
+                var traceId = context.TraceIdentifier;
+                context.Response.StatusCode = 409;
+
+                var payload = ApiResponse<object>.Fail(
+                    message: "This record was modified by another operation. Please retry.",
+                    errors: null,
                     traceId: traceId
                 );
 

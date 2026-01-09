@@ -6,7 +6,7 @@ using System.Threading.Tasks;
 using Forto.Api.Common;
 using Forto.Application.Abstractions.Repositories;
 using Forto.Application.DTOs.Employees;
-using Forto.Domain.Entities.Employee;
+using Forto.Domain.Entities.Employees;
 
 namespace Forto.Application.Abstractions.Services.Employees
 {
@@ -39,7 +39,8 @@ namespace Forto.Application.Abstractions.Services.Employees
                 Name = request.Name.Trim(),
                 Age = request.Age,
                 PhoneNumber = request.PhoneNumber,
-                IsActive = true
+                IsActive = true,
+                Role = request.Role,
             };
 
             await repo.AddAsync(employee);
@@ -70,6 +71,7 @@ namespace Forto.Application.Abstractions.Services.Employees
             employee.Age = request.Age;
             employee.PhoneNumber = request.PhoneNumber;
             employee.IsActive = request.IsActive;
+            employee.Role = request.Role;
 
             repo.Update(employee);
             await _uow.SaveChangesAsync();
@@ -94,7 +96,8 @@ namespace Forto.Application.Abstractions.Services.Employees
             Name = e.Name,
             Age = e.Age,
             PhoneNumber = e.PhoneNumber,
-            IsActive = e.IsActive
+            IsActive = e.IsActive,
+            Role = e.Role,
         };
     }
 }

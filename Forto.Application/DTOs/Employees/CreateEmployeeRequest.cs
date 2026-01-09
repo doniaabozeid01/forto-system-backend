@@ -1,4 +1,5 @@
-﻿using System;
+﻿using Forto.Domain.Enum;
+using System;
 using System.Collections.Generic;
 using System.ComponentModel.DataAnnotations;
 using System.Linq;
@@ -17,5 +18,8 @@ namespace Forto.Application.DTOs.Employees
 
         [Required, Phone]
         public string PhoneNumber { get; set; } = "";
+        [Range(1, 4)]
+        public EmployeeRole Role { get; set; } = EmployeeRole.Worker;
+
     }
 }
