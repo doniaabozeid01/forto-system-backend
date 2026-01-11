@@ -52,9 +52,9 @@ namespace Forto.Api.Controllers
 
         // SEARCH / LOOKUP (B)
         [HttpGet("lookup")]
-        public async Task<IActionResult> Lookup([FromQuery] string phone)
+        public async Task<IActionResult> Search([FromQuery] string phone, [FromQuery] int take = 10)
         {
-            var data = await _service.LookupByPhoneAsync(phone);
+            var data = await _service.SearchByPhoneAsync(phone, take);
             if (data == null) return OkResponse<object?>(null, "Client not found");
             return OkResponse(data, "OK");
         }

@@ -96,34 +96,96 @@ namespace Forto.Application.Abstractions.Services.Clients
             return true;
         }
 
-        public async Task<ClientLookupResponse?> LookupByPhoneAsync(string phone)
+        //public async Task<ClientLookupResponse?> LookupByPhoneAsync(string phone)
+        //{
+        //    var normalized = NormalizePhone(phone);
+        //    if (string.IsNullOrWhiteSpace(normalized)) return null;
+
+        //    var clientRepo = _uow.Repository<Client>();
+        //    var carRepo = _uow.Repository<Car>();
+
+        //    var clients = await clientRepo.FindAsync(c => c.PhoneNumber == normalized);
+        //    var client = clients.FirstOrDefault();
+        //    if (client == null) return null;
+
+        //    var cars = await carRepo.FindAsync(c => c.ClientId == client.Id);
+
+        //    var carDtos = cars.Select(MapCar).ToList();
+        //    var defaultCarId = carDtos.FirstOrDefault(x => x.IsDefault)?.Id;
+
+        //    return new ClientLookupResponse
+        //    {
+        //        Id = client.Id,
+        //        FullName = client.FullName,
+        //        PhoneNumber = client.PhoneNumber,
+        //        Email = client.Email,
+        //        IsActive = client.IsActive,
+        //        DefaultCarId = defaultCarId,
+        //        Cars = carDtos
+        //    };
+        //}
+
+
+
+
+
+
+
+
+
+
+        // مع “حد أقصى” للنتائج عشان الأداء (مثلاً 10)
+        public async Task<IReadOnlyList<ClientLookupResponse>> SearchByPhoneAsync(string phonePrefix, int take = 10)
         {
-            var normalized = NormalizePhone(phone);
-            if (string.IsNullOrWhiteSpace(normalized)) return null;
+            var prefix = NormalizePhone(phonePrefix);
+            if (string.IsNullOrWhiteSpace(prefix)) return new List<ClientLookupResponse>();
 
             var clientRepo = _uow.Repository<Client>();
             var carRepo = _uow.Repository<Car>();
 
-            var clients = await clientRepo.FindAsync(c => c.PhoneNumber == normalized);
-            var client = clients.FirstOrDefault();
-            if (client == null) return null;
+            // 1) هات العملاء اللي رقمهم يبدأ بالprefix
+            var clients = await clientRepo.FindAsync(c => c.PhoneNumber.StartsWith(prefix));
 
-            var cars = await carRepo.FindAsync(c => c.ClientId == client.Id);
+            // (اختياري) خدي أول N بس
+            clients = clients
+                .OrderBy(c => c.PhoneNumber)
+                .Take(take)
+                .ToList();
 
-            var carDtos = cars.Select(MapCar).ToList();
-            var defaultCarId = carDtos.FirstOrDefault(x => x.IsDefault)?.Id;
+            if (clients.Count == 0) return new List<ClientLookupResponse>();
 
-            return new ClientLookupResponse
+            // 2) هات كل العربيات مرة واحدة لكل العملاء (بدل query لكل عميل)
+            var clientIds = clients.Select(c => c.Id).ToList();
+            var cars = await carRepo.FindAsync(c => clientIds.Contains(c.ClientId));
+
+            var carsByClient = cars.GroupBy(c => c.ClientId).ToDictionary(g => g.Key, g => g.ToList());
+
+            // 3) ابنِ response list
+            var result = new List<ClientLookupResponse>();
+
+            foreach (var client in clients)
             {
-                Id = client.Id,
-                FullName = client.FullName,
-                PhoneNumber = client.PhoneNumber,
-                Email = client.Email,
-                IsActive = client.IsActive,
-                DefaultCarId = defaultCarId,
-                Cars = carDtos
-            };
+                carsByClient.TryGetValue(client.Id, out var clientCars);
+                clientCars ??= new List<Car>();
+
+                var carDtos = clientCars.Select(MapCar).ToList();
+                var defaultCarId = carDtos.FirstOrDefault(x => x.IsDefault)?.Id;
+
+                result.Add(new ClientLookupResponse
+                {
+                    Id = client.Id,
+                    FullName = client.FullName,
+                    PhoneNumber = client.PhoneNumber,
+                    Email = client.Email,
+                    IsActive = client.IsActive,
+                    DefaultCarId = defaultCarId,
+                    Cars = carDtos
+                });
+            }
+
+            return result;
         }
+
 
         private static ClientResponse Map(Client c) => new()
         {

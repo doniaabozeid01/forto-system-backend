@@ -15,6 +15,7 @@ namespace Forto.Application.Abstractions.Services.Clients
         Task<ClientResponse?> UpdateAsync(int id, UpdateClientRequest request);
         Task<bool> DeleteAsync(int id);
 
-        Task<ClientLookupResponse?> LookupByPhoneAsync(string phone);
+        //Task<ClientLookupResponse?> LookupByPhoneAsync(string phone);
+        Task<IReadOnlyList<ClientLookupResponse>> SearchByPhoneAsync(string phonePrefix, int take = 10);
     }
 }

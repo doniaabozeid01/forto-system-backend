@@ -22,7 +22,7 @@ namespace Forto.Api.Controllers
         }
 
         // Update Car
-        [HttpPut("UpdateCars/{carId:int}")]
+        [HttpPut("clients/UpdateCars/{carId:int}")]
         public async Task<IActionResult> Update(int carId, [FromBody] UpdateCarRequest request)
         {
             var data = await _service.UpdateAsync(carId, request);
@@ -31,7 +31,7 @@ namespace Forto.Api.Controllers
         }
 
         // Delete Car (soft)
-        [HttpDelete("DeleteCar/{carId:int}")]
+        [HttpDelete("clients/DeleteCar/{carId:int}")]
         public async Task<IActionResult> Delete(int carId)
         {
             var ok = await _service.DeleteAsync(carId);
