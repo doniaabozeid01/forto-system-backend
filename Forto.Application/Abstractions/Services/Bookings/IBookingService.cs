@@ -23,8 +23,8 @@ namespace Forto.Application.Abstractions.Services.Bookings
 
 
         // Admin
-        Task CancelBookingItemAsync(int itemId, CashierActionRequest request);
-        Task CancelBookingAsync(int bookingId, CashierActionRequest request);
-        Task CompleteBookingAsync(int bookingId, CashierActionRequest request); // manual complete
+        //Task CancelBookingItemAsync(int itemId, CashierActionRequest request);
+        //Task CancelBookingAsync(int bookingId, CashierActionRequest request);
+        //Task CompleteBookingAsync(int bookingId, CashierActionRequest request); // manual complete
     }
 }

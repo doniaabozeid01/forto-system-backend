@@ -13,6 +13,6 @@ namespace Forto.Application.Abstractions.Services.Invoices
         Task<InvoiceResponse> EnsureInvoiceForBookingAsync(int bookingId); // create if not exists
         Task<InvoiceResponse> PayCashAsync(int invoiceId, int cashierId);
 
-        Task RecalculateForBookingAsync(int bookingId); // لو اتلغت خدمات قبل الدفع
+        Task RecalculateForBookingAsync(int bookingId, bool save = true); // لو اتلغت خدمات قبل الدفع
     }
 }

@@ -1,4 +1,5 @@
 ﻿using Forto.Application.Abstractions.Services.Bookings;
+using Forto.Application.Abstractions.Services.Bookings.Admin;
 using Forto.Application.DTOs.Billings;
 using Forto.Application.DTOs.Bookings;
 using Microsoft.AspNetCore.Http;
@@ -11,7 +12,12 @@ namespace Forto.Api.Controllers
     public class BookingsController : BaseApiController
     {
         private readonly IBookingService _service;
-        public BookingsController(IBookingService service) => _service = service;
+        private readonly IBookingAdminService _adminService;
+
+        public BookingsController(IBookingService service, IBookingAdminService adminService) {
+            _service = service;
+            _adminService = adminService;
+        }
 
         [HttpGet("available-slots")]
         public async Task<IActionResult> AvailableSlots([FromQuery] int branchId, [FromQuery] string date, [FromQuery] int carId, [FromQuery] string serviceIds)
@@ -50,14 +56,14 @@ namespace Forto.Api.Controllers
         [HttpPost("{bookingId:int}/complete")]
         public async Task<IActionResult> ManualComplete(int bookingId, [FromBody] CashierActionRequest request)
         {
-            await _service.CompleteBookingAsync(bookingId, request);
+            await _adminService.CompleteBookingAsync(bookingId, request);
             return OkResponse(new { bookingId }, "Booking completed");
         }
 
         [HttpPost("{bookingId:int}/cancel")]
         public async Task<IActionResult> CancelBooking(int bookingId, [FromBody] CashierActionRequest request)
         {
-            await _service.CancelBookingAsync(bookingId, request);
+            await _adminService.CancelBookingAsync(bookingId, request);
             return OkResponse(new { bookingId }, "Booking cancelled");
         }
     }

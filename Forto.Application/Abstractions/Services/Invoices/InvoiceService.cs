@@ -5,6 +5,7 @@ using Forto.Domain.Entities.Billings;
 using Forto.Domain.Entities.Bookings;
 using Forto.Domain.Entities.Employees;
 using Forto.Domain.Enum;
+using Microsoft.EntityFrameworkCore;
 using System;
 using System.Collections.Generic;
 using System.Linq;
@@ -44,6 +45,10 @@ namespace Forto.Application.Abstractions.Services.Invoices
             var booking = await bookingRepo.GetByIdAsync(bookingId);
             if (booking == null)
                 throw new BusinessException("Booking not found", 404);
+
+            if (booking.Status == BookingStatus.Cancelled)
+                throw new BusinessException("Cannot create invoice for a cancelled booking", 409);
+
 
             // لو الفاتورة موجودة خلاص
             var existing = (await invRepo.FindAsync(x => x.BookingId == bookingId)).FirstOrDefault();
@@ -183,7 +188,7 @@ namespace Forto.Application.Abstractions.Services.Invoices
 
 
 
-        public async Task RecalculateForBookingAsync(int bookingId)
+        public async Task RecalculateForBookingAsync(int bookingId, bool save = true)
         {
             var invRepo = _uow.Repository<Invoice>();
             var lineRepo = _uow.Repository<InvoiceLine>();
@@ -223,15 +228,29 @@ namespace Forto.Application.Abstractions.Services.Invoices
             invRepo.Update(inv);
 
             // ✅ single save
+            //try
+            //{
+            //    await _uow.SaveChangesAsync();
+            //}
+            //catch (DbUpdateConcurrencyException)
+            //{
+            //    // conflict -> يرجع 409 بدل 500
+            //    throw new BusinessException("Invoice was updated by another operation. Please retry.", 409);
+            //}
+
+
+            if (!save) return;
+
             try
             {
                 await _uow.SaveChangesAsync();
             }
             catch (Microsoft.EntityFrameworkCore.DbUpdateConcurrencyException)
             {
-                // conflict -> يرجع 409 بدل 500
                 throw new BusinessException("Invoice was updated by another operation. Please retry.", 409);
             }
+
+
         }
 
 

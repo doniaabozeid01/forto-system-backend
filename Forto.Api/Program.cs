@@ -3,6 +3,7 @@ using Forto.Api.Common;
 using Forto.Api.Middleware;
 using Forto.Application.Abstractions.Repositories;
 using Forto.Application.Abstractions.Services.Bookings;
+using Forto.Application.Abstractions.Services.Bookings.Admin;
 using Forto.Application.Abstractions.Services.Cars;
 using Forto.Application.Abstractions.Services.Catalogs.Categories;
 using Forto.Application.Abstractions.Services.Catalogs.Service;
@@ -85,6 +86,7 @@ namespace Forto.Api
             builder.Services.AddScoped<IInvoiceService, InvoiceService>();
             // ? BookingService ???? ????? InvoiceService
             builder.Services.AddScoped<IBookingService, BookingService>();
+            builder.Services.AddScoped<IBookingAdminService, BookingAdminService>();
 
 
             // Learn more about configuring Swagger/OpenAPI at https://aka.ms/aspnetcore/swashbuckle

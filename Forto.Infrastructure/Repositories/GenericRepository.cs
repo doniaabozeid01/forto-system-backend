@@ -31,6 +31,13 @@ namespace Forto.Infrastructure.Repositories
         public async Task<IReadOnlyList<T>> FindAsync(Expression<Func<T, bool>> predicate)
             => await _set.AsNoTracking().Where(predicate).ToListAsync();
 
+
+
+        public async Task<IReadOnlyList<T>> FindTrackingAsync(Expression<Func<T, bool>> predicate)
+    => await _set.Where(predicate).ToListAsync(); // بدون AsNoTracking
+
+
+
         public async Task AddAsync(T entity)
             => await _set.AddAsync(entity);
 

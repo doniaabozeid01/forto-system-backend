@@ -14,6 +14,8 @@ namespace Forto.Application.Abstractions.Repositories
         Task<IReadOnlyList<T>> GetAllAsync();
 
         Task<IReadOnlyList<T>> FindAsync(Expression<Func<T, bool>> predicate);
+        Task<IReadOnlyList<T>> FindTrackingAsync(Expression<Func<T, bool>> predicate);
+
 
         Task AddAsync(T entity);
         Task AddRangeAsync(IEnumerable<T> entities);
