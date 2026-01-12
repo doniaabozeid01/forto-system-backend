@@ -6,12 +6,16 @@ using Forto.Application.Abstractions.Services.Bookings;
 using Forto.Application.Abstractions.Services.Bookings.Admin;
 using Forto.Application.Abstractions.Services.Cars;
 using Forto.Application.Abstractions.Services.Catalogs.Categories;
+using Forto.Application.Abstractions.Services.Catalogs.Recipes;
 using Forto.Application.Abstractions.Services.Catalogs.Service;
 using Forto.Application.Abstractions.Services.Clients;
 using Forto.Application.Abstractions.Services.Employees;
 using Forto.Application.Abstractions.Services.Employees.Tasks;
 using Forto.Application.Abstractions.Services.EmployeeServices;
+using Forto.Application.Abstractions.Services.Inventory.Materials;
+using Forto.Application.Abstractions.Services.Inventory.MaterialsCheck;
 using Forto.Application.Abstractions.Services.Invoices;
+using Forto.Application.Abstractions.Services.Ops.Stock;
 using Forto.Application.Abstractions.Services.Schedule;
 using Forto.Application.Abstractions.Services.Shift;
 using Forto.Infrastructure.Data;
@@ -87,6 +91,10 @@ namespace Forto.Api
             // ? BookingService ???? ????? InvoiceService
             builder.Services.AddScoped<IBookingService, BookingService>();
             builder.Services.AddScoped<IBookingAdminService, BookingAdminService>();
+            builder.Services.AddScoped<IMaterialService, MaterialService>();
+            builder.Services.AddScoped<IBranchStockService, BranchStockService>();
+            builder.Services.AddScoped<IServiceRecipeService, ServiceRecipeService>();
+            builder.Services.AddScoped<IMaterialsCheckService, MaterialsCheckService>();
 
 
             // Learn more about configuring Swagger/OpenAPI at https://aka.ms/aspnetcore/swashbuckle

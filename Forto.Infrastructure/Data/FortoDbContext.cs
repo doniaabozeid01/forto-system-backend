@@ -11,6 +11,7 @@ using Forto.Domain.Entities.Bookings;
 using Forto.Domain.Entities.Catalog;
 using Forto.Domain.Entities.Clients;
 using Forto.Domain.Entities.Employees;
+using Forto.Domain.Entities.Inventory;
 using Forto.Domain.Entities.Ops;
 using Microsoft.EntityFrameworkCore;
 
@@ -217,6 +218,104 @@ namespace Forto.Infrastructure.Data
                 .WithOne(x => x.Invoice)
                 .HasForeignKey(x => x.InvoiceId)
                 .OnDelete(DeleteBehavior.Cascade);
+
+
+
+
+
+
+
+
+
+
+
+            modelBuilder.Entity<Material>().ToTable("Materials", "inventory");
+            modelBuilder.Entity<BranchMaterialStock>().ToTable("BranchMaterialStocks", "ops");
+
+            modelBuilder.Entity<Material>()
+                .Property(x => x.Unit)
+                .HasConversion<int>();
+
+            // decimal precision
+            modelBuilder.Entity<Material>()
+                .Property(x => x.CostPerUnit)
+                .HasPrecision(18, 3);
+
+            modelBuilder.Entity<Material>()
+                .Property(x => x.ChargePerUnit)
+                .HasPrecision(18, 3);
+
+            modelBuilder.Entity<BranchMaterialStock>()
+                .Property(x => x.OnHandQty)
+                .HasPrecision(18, 3);
+
+            modelBuilder.Entity<BranchMaterialStock>()
+                .Property(x => x.ReservedQty)
+                .HasPrecision(18, 3);
+
+            modelBuilder.Entity<BranchMaterialStock>()
+                .Property(x => x.ReorderLevel)
+                .HasPrecision(18, 3);
+
+            // Unique stock per (Branch, Material)
+            modelBuilder.Entity<BranchMaterialStock>()
+                .HasIndex(x => new { x.BranchId, x.MaterialId })
+                .IsUnique();
+
+            // prevent negatives (optional but good)
+            modelBuilder.Entity<BranchMaterialStock>()
+                .HasCheckConstraint("CK_BranchStock_OnHand_NonNegative", "[OnHandQty] >= 0");
+
+            modelBuilder.Entity<BranchMaterialStock>()
+                .HasCheckConstraint("CK_BranchStock_Reserved_NonNegative", "[ReservedQty] >= 0");
+
+            // relationships (avoid cascade path problems => NoAction)
+            modelBuilder.Entity<BranchMaterialStock>()
+                .HasOne(x => x.Branch)
+                .WithMany()
+                .HasForeignKey(x => x.BranchId)
+                .OnDelete(DeleteBehavior.NoAction);
+
+            modelBuilder.Entity<BranchMaterialStock>()
+                .HasOne(x => x.Material)
+                .WithMany()
+                .HasForeignKey(x => x.MaterialId)
+                .OnDelete(DeleteBehavior.NoAction);
+
+
+
+
+
+
+
+
+            modelBuilder.Entity<ServiceMaterialRecipe>().ToTable("ServiceMaterialRecipes", "catalog");
+
+            modelBuilder.Entity<ServiceMaterialRecipe>()
+                .Property(x => x.BodyType)
+                .HasConversion<int>();
+
+            modelBuilder.Entity<ServiceMaterialRecipe>()
+                .Property(x => x.DefaultQty)
+                .HasPrecision(18, 3);
+
+            modelBuilder.Entity<ServiceMaterialRecipe>()
+                .HasIndex(x => new { x.ServiceId, x.BodyType, x.MaterialId })
+                .IsUnique();
+
+            // avoid cascade path issues
+            modelBuilder.Entity<ServiceMaterialRecipe>()
+                .HasOne(x => x.Service)
+                .WithMany()
+                .HasForeignKey(x => x.ServiceId)
+                .OnDelete(DeleteBehavior.NoAction);
+
+            modelBuilder.Entity<ServiceMaterialRecipe>()
+                .HasOne(x => x.Material)
+                .WithMany()
+                .HasForeignKey(x => x.MaterialId)
+                .OnDelete(DeleteBehavior.NoAction);
+
 
 
 
