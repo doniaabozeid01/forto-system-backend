@@ -31,6 +31,7 @@ namespace Forto.Domain.Entities.Bookings
         public Employee? AssignedEmployee { get; set; }
 
         public byte[]? RowVersion { get; set; }
+        public decimal MaterialAdjustment { get; set; } = 0m;
 
         public DateTime? StartedAt { get; set; }
         public DateTime? CompletedAt { get; set; }

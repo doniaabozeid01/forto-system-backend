@@ -5,6 +5,7 @@ using System.Text;
 using System.Threading.Tasks;
 using Forto.Api.Common;
 using Forto.Application.Abstractions.Repositories;
+using Forto.Application.Abstractions.Services.Bookings.Closing;
 using Forto.Application.Abstractions.Services.Invoices;
 using Forto.Application.DTOs.Billings;
 using Forto.Domain.Entities.Bookings;
@@ -18,11 +19,13 @@ namespace Forto.Application.Abstractions.Services.Bookings.Admin
     {
         private readonly IUnitOfWork _uow;
         private readonly IInvoiceService _invoiceService;
+        private readonly IBookingClosingService _closingService;
 
-        public BookingAdminService(IUnitOfWork uow, IInvoiceService invoiceService)
+        public BookingAdminService(IUnitOfWork uow, IInvoiceService invoiceService, IBookingClosingService closingService)
         {
             _uow = uow;
             _invoiceService = invoiceService;
+            _closingService = closingService;
         }
 
 
@@ -186,29 +189,6 @@ namespace Forto.Application.Abstractions.Services.Bookings.Admin
 
 
 
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
         public async Task CancelBookingItemAsync(int itemId, CashierActionRequest request)
         {
             await RequireCashierAsync(request.CashierId);
@@ -236,7 +216,7 @@ namespace Forto.Application.Abstractions.Services.Bookings.Admin
             await RecalculateBookingTotalsAsync(item.BookingId, save: false);
 
             // 3) Auto close booking (NO SaveChanges)
-            await TryAutoCloseBookingAsync(item.BookingId, save: false);
+            await _closingService.TryAutoCloseBookingAsync(item.BookingId, save: false);
 
             // اقرأ حالة البوكينج بعد التعديلات (من نفس context)
             var booking = await bookingRepo.GetByIdAsync(item.BookingId);
@@ -316,8 +296,6 @@ namespace Forto.Application.Abstractions.Services.Bookings.Admin
             // ✅ مهم: لا تعمل Recalculate invoice هنا
             // ولو حابة تلغي invoice غير مدفوعة (اختياري)، نعمل method CancelInvoiceForBooking
         }
-
-
 
         public async Task CompleteBookingAsync(int bookingId, CashierActionRequest request)
         {
@@ -414,52 +392,52 @@ namespace Forto.Application.Abstractions.Services.Bookings.Admin
         //}
 
 
-        private async Task TryAutoCloseBookingAsync(int bookingId, bool save = true)
-        {
-            var bookingRepo = _uow.Repository<Booking>();
-            var itemRepo = _uow.Repository<BookingItem>();
+        //private async Task TryAutoCloseBookingAsync(int bookingId, bool save = true)
+        //{
+        //    var bookingRepo = _uow.Repository<Booking>();
+        //    var itemRepo = _uow.Repository<BookingItem>();
 
-            var booking = await bookingRepo.GetByIdAsync(bookingId);
-            if (booking == null) return;
+        //    var booking = await bookingRepo.GetByIdAsync(bookingId);
+        //    if (booking == null) return;
 
-            if (booking.Status == BookingStatus.Completed || booking.Status == BookingStatus.Cancelled)
-                return;
+        //    if (booking.Status == BookingStatus.Completed || booking.Status == BookingStatus.Cancelled)
+        //        return;
 
-            //var items = await itemRepo.FindAsync(i => i.BookingId == bookingId);
-            var items = await itemRepo.FindTrackingAsync(i => i.BookingId == bookingId);
+        //    //var items = await itemRepo.FindAsync(i => i.BookingId == bookingId);
+        //    var items = await itemRepo.FindTrackingAsync(i => i.BookingId == bookingId);
 
-            if (items.Count == 0) return;
+        //    if (items.Count == 0) return;
 
-            // لازم يكون مفيش Pending/InProgress
-            var stillOpen = items.Any(i => i.Status == BookingItemStatus.Pending || i.Status == BookingItemStatus.InProgress);
-            if (stillOpen) return;
+        //    // لازم يكون مفيش Pending/InProgress
+        //    var stillOpen = items.Any(i => i.Status == BookingItemStatus.Pending || i.Status == BookingItemStatus.InProgress);
+        //    if (stillOpen) return;
 
-            var allCancelled = items.All(i => i.Status == BookingItemStatus.Cancelled);
-            if (allCancelled)
-            {
-                booking.Status = BookingStatus.Cancelled;
-                booking.CompletedAt = DateTime.UtcNow; // أو خليها CancelledAt لو عندك
-                bookingRepo.Update(booking);
+        //    var allCancelled = items.All(i => i.Status == BookingItemStatus.Cancelled);
+        //    if (allCancelled)
+        //    {
+        //        booking.Status = BookingStatus.Cancelled;
+        //        booking.CompletedAt = DateTime.UtcNow; // أو خليها CancelledAt لو عندك
+        //        bookingRepo.Update(booking);
 
-                // totals = 0
-                booking.TotalPrice = 0;
-                booking.EstimatedDurationMinutes = 0;
-                bookingRepo.Update(booking);
+        //        // totals = 0
+        //        booking.TotalPrice = 0;
+        //        booking.EstimatedDurationMinutes = 0;
+        //        bookingRepo.Update(booking);
 
-                if (save) await _uow.SaveChangesAsync();
-                return;
-            }
+        //        if (save) await _uow.SaveChangesAsync();
+        //        return;
+        //    }
 
-            // هنا معناها: فيه Done (والباقي Cancelled) => Completed
-            var allDoneOrCancelled = items.All(i => i.Status == BookingItemStatus.Done || i.Status == BookingItemStatus.Cancelled);
-            if (!allDoneOrCancelled) return;
+        //    // هنا معناها: فيه Done (والباقي Cancelled) => Completed
+        //    var allDoneOrCancelled = items.All(i => i.Status == BookingItemStatus.Done || i.Status == BookingItemStatus.Cancelled);
+        //    if (!allDoneOrCancelled) return;
 
-            booking.Status = BookingStatus.Completed;
-            booking.CompletedAt = DateTime.UtcNow;
-            bookingRepo.Update(booking);
+        //    booking.Status = BookingStatus.Completed;
+        //    booking.CompletedAt = DateTime.UtcNow;
+        //    bookingRepo.Update(booking);
 
-            if (save) await _uow.SaveChangesAsync();
-        }
+        //    if (save) await _uow.SaveChangesAsync();
+        //}
 
 
     }

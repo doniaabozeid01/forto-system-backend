@@ -15,6 +15,8 @@ using System.Threading.Tasks;
 using Microsoft.EntityFrameworkCore;
 using Forto.Application.Abstractions.Services.Invoices;
 using Forto.Application.DTOs.Billings;
+using Forto.Domain.Entities.Inventory;
+using Forto.Application.Abstractions.Services.Bookings.Closing;
 
 namespace Forto.Application.Abstractions.Services.Bookings
 {
@@ -22,9 +24,11 @@ namespace Forto.Application.Abstractions.Services.Bookings
     {
         private readonly IUnitOfWork _uow;
         readonly IInvoiceService _invoiceService;
+        private readonly IBookingClosingService _closingService;
 
-        public BookingService(IUnitOfWork uow, IInvoiceService invoiceService) {
+        public BookingService(IUnitOfWork uow, IInvoiceService invoiceService, IBookingClosingService closingService) {
             _invoiceService = invoiceService;
+            _closingService = closingService;
             _uow = uow;
         }
 
@@ -251,60 +255,236 @@ namespace Forto.Application.Abstractions.Services.Bookings
             return Map(booking);
         }
 
+
+
+
+        // before add materials
+        //public async Task<BookingItemResponse> StartItemAsync(int itemId, int employeeId)
+        //{
+        //    var itemRepo = _uow.Repository<BookingItem>();
+        //    var bookingRepo = _uow.Repository<Booking>();
+
+        //    var item = await itemRepo.GetByIdAsync(itemId);
+        //    if (item == null)
+        //        throw new BusinessException("Booking item not found", 404);
+
+        //    if (item.Status != BookingItemStatus.Pending)
+        //        throw new BusinessException("Item cannot be started in its current status", 409);
+
+        //    // Validate employee exists + active
+        //    var emp = await _uow.Repository<Employee>().GetByIdAsync(employeeId);
+        //    if (emp == null || !emp.IsActive)
+        //        throw new BusinessException("Employee not found", 404);
+
+        //    // ✅ أهم شرط عندك: employee must be qualified for this service
+        //    var linkRepo = _uow.Repository<EmployeeService>();
+        //    var qualified = await linkRepo.AnyAsync(x => x.EmployeeId == employeeId && x.ServiceId == item.ServiceId && x.IsActive);
+        //    if (!qualified)
+        //        throw new BusinessException("Employee is not qualified for this service", 409);
+
+        //    // Assign + start
+        //    item.AssignedEmployeeId = employeeId;
+        //    item.Status = BookingItemStatus.InProgress;
+        //    item.StartedAt = DateTime.UtcNow;
+
+        //    itemRepo.Update(item);
+
+        //    // Update booking status if needed
+        //    var booking = await bookingRepo.GetByIdAsync(item.BookingId);
+        //    if (booking == null)
+        //        throw new BusinessException("Booking not found", 404);
+
+        //    if (booking.Status == BookingStatus.Pending)
+        //    {
+        //        booking.Status = BookingStatus.InProgress;
+        //        bookingRepo.Update(booking);
+        //    }
+
+        //    //await _uow.SaveChangesAsync();
+        //    try
+        //    {
+        //        await _uow.SaveChangesAsync();
+        //    }
+        //    catch (DbUpdateConcurrencyException)
+        //    {
+        //        throw new BusinessException("This service item was already taken/updated by another employee.", 409);
+        //    }
+
+
+        //    return MapItem(item);
+        //}
+
+
+
+
+
+
+        //after add materials        
         public async Task<BookingItemResponse> StartItemAsync(int itemId, int employeeId)
+    {
+        var itemRepo = _uow.Repository<BookingItem>();
+        var bookingRepo = _uow.Repository<Booking>();
+
+        var item = await itemRepo.GetByIdAsync(itemId);
+        if (item == null)
+            throw new BusinessException("Booking item not found", 404);
+
+        if (item.Status != BookingItemStatus.Pending)
+            throw new BusinessException("Item cannot be started in its current status", 409);
+
+        // employee exists + active (زي ما عندك)
+        var emp = await _uow.Repository<Employee>().GetByIdAsync(employeeId);
+        if (emp == null || !emp.IsActive)
+            throw new BusinessException("Employee not found", 404);
+
+        // ✅ employee must be qualified
+        var linkRepo = _uow.Repository<EmployeeService>();
+        var qualified = await linkRepo.AnyAsync(x => x.EmployeeId == employeeId && x.ServiceId == item.ServiceId && x.IsActive);
+        if (!qualified)
+            throw new BusinessException("Employee is not qualified for this service", 409);
+
+        // load booking to know branch
+        var booking = await bookingRepo.GetByIdAsync(item.BookingId);
+        if (booking == null)
+            throw new BusinessException("Booking not found", 404);
+
+        var branchId = booking.BranchId;
+
+        // 1) load recipe for (serviceId, bodyType)
+        var recipeRepo = _uow.Repository<ServiceMaterialRecipe>();
+        var recipeRows = await recipeRepo.FindAsync(r =>
+            r.IsActive && r.ServiceId == item.ServiceId && r.BodyType == item.BodyType);
+
+        if (recipeRows.Count == 0)
+            throw new BusinessException("Missing recipe for this service and car type", 409,
+                new Dictionary<string, string[]>
+                {
+                    ["recipe"] = new[] { $"No recipe for serviceId={item.ServiceId} bodyType={item.BodyType}" }
+                });
+
+        // 2) load material definitions (cost/charge/unit)
+        var materialRepo = _uow.Repository<Material>();
+        var materialIds = recipeRows.Select(r => r.MaterialId).Distinct().ToList();
+        var materials = await materialRepo.FindAsync(m => materialIds.Contains(m.Id) && m.IsActive);
+        var matMap = materials.ToDictionary(m => m.Id, m => m);
+
+        var missingMat = materialIds.Where(id => !matMap.ContainsKey(id)).ToList();
+        if (missingMat.Any())
+            throw new BusinessException("Some materials in recipe are missing/inactive", 409);
+
+        // 3) load branch stocks TRACKING (important)
+        var stockRepo = _uow.Repository<BranchMaterialStock>();
+        var stocks = await stockRepo.FindTrackingAsync(s => s.BranchId == branchId && materialIds.Contains(s.MaterialId));
+        var stockMap = stocks.ToDictionary(s => s.MaterialId, s => s);
+
+        // if stock row missing => treat as 0 available
+        foreach (var mid in materialIds)
+            if (!stockMap.ContainsKey(mid))
+                stockMap[mid] = null; // marker
+
+        // 4) check availability against Available = OnHand - Reserved
+        var missing = new List<string>();
+
+        foreach (var row in recipeRows)
         {
-            var itemRepo = _uow.Repository<BookingItem>();
-            var bookingRepo = _uow.Repository<Booking>();
+            var req = row.DefaultQty;
+            stockMap.TryGetValue(row.MaterialId, out var stock);
 
-            var item = await itemRepo.GetByIdAsync(itemId);
-            if (item == null)
-                throw new BusinessException("Booking item not found", 404);
+            var onHand = stock?.OnHandQty ?? 0m;
+            var reserved = stock?.ReservedQty ?? 0m;
+            var available = onHand - reserved;
+            if (available < 0) available = 0;
 
-            if (item.Status != BookingItemStatus.Pending)
-                throw new BusinessException("Item cannot be started in its current status", 409);
-
-            // Validate employee exists + active
-            var emp = await _uow.Repository<Employee>().GetByIdAsync(employeeId);
-            if (emp == null || !emp.IsActive)
-                throw new BusinessException("Employee not found", 404);
-
-            // ✅ أهم شرط عندك: employee must be qualified for this service
-            var linkRepo = _uow.Repository<EmployeeService>();
-            var qualified = await linkRepo.AnyAsync(x => x.EmployeeId == employeeId && x.ServiceId == item.ServiceId && x.IsActive);
-            if (!qualified)
-                throw new BusinessException("Employee is not qualified for this service", 409);
-
-            // Assign + start
-            item.AssignedEmployeeId = employeeId;
-            item.Status = BookingItemStatus.InProgress;
-            item.StartedAt = DateTime.UtcNow;
-
-            itemRepo.Update(item);
-
-            // Update booking status if needed
-            var booking = await bookingRepo.GetByIdAsync(item.BookingId);
-            if (booking == null)
-                throw new BusinessException("Booking not found", 404);
-
-            if (booking.Status == BookingStatus.Pending)
+            if (available < req)
             {
-                booking.Status = BookingStatus.InProgress;
-                bookingRepo.Update(booking);
+                var mat = matMap[row.MaterialId];
+                missing.Add($"{mat.Name}: need {req} {mat.Unit}, available {available} {mat.Unit}");
             }
-
-            //await _uow.SaveChangesAsync();
-            try
-            {
-                await _uow.SaveChangesAsync();
-            }
-            catch (DbUpdateConcurrencyException)
-            {
-                throw new BusinessException("This service item was already taken/updated by another employee.", 409);
-            }
-
-
-            return MapItem(item);
         }
+
+        if (missing.Any())
+            throw new BusinessException("Not enough stock to start this service", 409,
+                new Dictionary<string, string[]> { ["materials"] = missing.ToArray() });
+
+        // 5) reserve + create usage rows (Default=Reserved=Actual initially)
+        var usageRepo = _uow.Repository<BookingItemMaterialUsage>();
+
+        foreach (var row in recipeRows)
+        {
+            var mat = matMap[row.MaterialId];
+            var qty = row.DefaultQty;
+
+            // update branch stock reserved
+            var stock = stockMap[row.MaterialId];
+            if (stock == null)
+            {
+                // لو عايزة تمنعي إنشاء stock تلقائيًا: ارمي error
+                // أنا أفضل نرمي error عشان المخزون لازم يتسجل
+                throw new BusinessException("Stock row missing for material in this branch", 409,
+                    new Dictionary<string, string[]>
+                    {
+                        ["material"] = new[] { $"MaterialId={row.MaterialId} has no stock row in branch {branchId}" }
+                    });
+            }
+
+            stock.ReservedQty += qty;
+            stockRepo.Update(stock);
+
+            // create usage record
+            await usageRepo.AddAsync(new BookingItemMaterialUsage
+            {
+                BookingItemId = item.Id,
+                MaterialId = row.MaterialId,
+                DefaultQty = qty,
+                ReservedQty = qty,
+                ActualQty = qty,
+                UnitCost = mat.CostPerUnit,
+                UnitCharge = mat.ChargePerUnit,
+                ExtraCharge = 0,
+                RecordedByEmployeeId = employeeId,
+                RecordedAt = DateTime.UtcNow
+            });
+        }
+
+        // 6) mark item started
+        item.AssignedEmployeeId = employeeId;
+        item.Status = BookingItemStatus.InProgress;
+        item.StartedAt = DateTime.UtcNow;
+        itemRepo.Update(item);
+
+        // booking status -> InProgress if was pending
+        if (booking.Status == BookingStatus.Pending)
+        {
+            booking.Status = BookingStatus.InProgress;
+            bookingRepo.Update(booking);
+        }
+
+        // ✅ ONE SAVE (with concurrency handling)
+        try
+        {
+            await _uow.SaveChangesAsync();
+        }
+        catch (DbUpdateConcurrencyException)
+        {
+            throw new BusinessException("Stock was modified by another operation. Please retry.", 409);
+        }
+
+        return MapItem(item);
+    }
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 
         //public async Task<BookingItemResponse> CompleteItemAsync(int itemId, int employeeId)
         //{
@@ -364,15 +544,93 @@ namespace Forto.Application.Abstractions.Services.Bookings
 
 
 
+        // before material
 
-public async Task<BookingItemResponse> CompleteItemAsync(int itemId, int employeeId)
+        //public async Task<BookingItemResponse> CompleteItemAsync(int itemId, int employeeId)
+        //{
+        //    var itemRepo = _uow.Repository<BookingItem>();
+        //    var bookingRepo = _uow.Repository<Booking>();
+
+        //    var item = await itemRepo.GetByIdAsync(itemId);
+        //    if (item == null)
+        //        throw new BusinessException("Booking item not found", 404);
+
+        //    if (item.Status != BookingItemStatus.InProgress)
+        //        throw new BusinessException("Item cannot be completed in its current status", 409);
+
+        //    if (item.AssignedEmployeeId != employeeId)
+        //        throw new BusinessException("Only the assigned employee can complete this item", 403);
+
+        //    // ✅ mark done
+        //    item.Status = BookingItemStatus.Done;
+        //    item.CompletedAt = DateTime.UtcNow;
+        //    itemRepo.Update(item);
+
+        //    // load booking + all items
+        //    var booking = await bookingRepo.GetByIdAsync(item.BookingId);
+        //    if (booking == null)
+        //        throw new BusinessException("Booking not found", 404);
+
+        //    var allItems = await itemRepo.FindAsync(i => i.BookingId == item.BookingId);
+
+        //    // ✅ condition: Done OR Cancelled
+        //    var completed = allItems.All(i =>
+        //        i.Id == item.Id
+        //            ? true
+        //            : (i.Status == BookingItemStatus.Done || i.Status == BookingItemStatus.Cancelled)
+        //    );
+
+        //    if (completed)
+        //    {
+        //        booking.Status = BookingStatus.Completed;
+        //        booking.CompletedAt = DateTime.UtcNow;
+        //        bookingRepo.Update(booking);
+        //    }
+
+        //    try
+        //    {
+        //        await _uow.SaveChangesAsync();
+        //    }
+        //    catch (DbUpdateConcurrencyException)
+        //    {
+        //        throw new BusinessException("This service item was already updated by another employee. Please retry.", 409);
+        //    }
+
+        //    // ✅ after save: if booking completed -> create invoice (idempotent)
+        //    if (completed)
+        //    {
+        //        await _invoiceService.EnsureInvoiceForBookingAsync(item.BookingId);
+        //    }
+
+        //    return MapItem(item);
+        //}
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+        // after material
+        public async Task<BookingItemResponse> CompleteItemAsync(int itemId, int employeeId)
     {
         var itemRepo = _uow.Repository<BookingItem>();
         var bookingRepo = _uow.Repository<Booking>();
+        var usageRepo = _uow.Repository<BookingItemMaterialUsage>();
+        var stockRepo = _uow.Repository<BranchMaterialStock>();
 
         var item = await itemRepo.GetByIdAsync(itemId);
-        if (item == null)
-            throw new BusinessException("Booking item not found", 404);
+        if (item == null) throw new BusinessException("Booking item not found", 404);
 
         if (item.Status != BookingItemStatus.InProgress)
             throw new BusinessException("Item cannot be completed in its current status", 409);
@@ -380,49 +638,109 @@ public async Task<BookingItemResponse> CompleteItemAsync(int itemId, int employe
         if (item.AssignedEmployeeId != employeeId)
             throw new BusinessException("Only the assigned employee can complete this item", 403);
 
-        // ✅ mark done
+        var booking = await bookingRepo.GetByIdAsync(item.BookingId);
+        if (booking == null) throw new BusinessException("Booking not found", 404);
+
+        var branchId = booking.BranchId;
+
+        // ✅ load usages tracking
+        var usages = await usageRepo.FindTrackingAsync(u => u.BookingItemId == item.Id);
+        if (usages.Count == 0)
+            throw new BusinessException("No reserved materials found for this item (start it first)", 409);
+
+        var materialIds = usages.Select(u => u.MaterialId).Distinct().ToList();
+
+        // ✅ load stocks tracking
+        var stocks = await stockRepo.FindTrackingAsync(s => s.BranchId == branchId && materialIds.Contains(s.MaterialId));
+        var stockMap = stocks.ToDictionary(s => s.MaterialId, s => s);
+
+        // 1) final check + consume + release reserved
+        foreach (var u in usages)
+        {
+            if (!stockMap.TryGetValue(u.MaterialId, out var stock))
+                throw new BusinessException("Stock row missing for a material in this branch", 409);
+
+            // available if we release this item's reserved first:
+            // availableNow = onHand - reserved + u.ReservedQty
+            var availableNow = stock.OnHandQty - stock.ReservedQty + u.ReservedQty;
+            if (availableNow < 0) availableNow = 0;
+
+            if (availableNow < u.ActualQty)
+            {
+                throw new BusinessException("Not enough stock to complete this service", 409,
+                    new Dictionary<string, string[]>
+                    {
+                        ["materials"] = new[]
+                        {
+                        $"MaterialId={u.MaterialId}: need {u.ActualQty}, available {availableNow}"
+                        }
+                    });
+            }
+
+            // release reservation
+            stock.ReservedQty -= u.ReservedQty;
+            if (stock.ReservedQty < 0) stock.ReservedQty = 0;
+
+            // consume actual
+            stock.OnHandQty -= u.ActualQty;
+            if (stock.OnHandQty < 0) stock.OnHandQty = 0; // safety, but check above should prevent
+
+            stockRepo.Update(stock);
+
+            // optional: mark reservation released at usage row level
+            u.ReservedQty = 0;
+            usageRepo.Update(u);
+        }
+
+        // 2) compute total adjustment for this item
+        var adjustment = usages.Sum(u => u.ExtraCharge); // now can be +/-
+        item.MaterialAdjustment = adjustment;
+
+        // 3) set done
         item.Status = BookingItemStatus.Done;
         item.CompletedAt = DateTime.UtcNow;
         itemRepo.Update(item);
 
-        // load booking + all items
-        var booking = await bookingRepo.GetByIdAsync(item.BookingId);
-        if (booking == null)
-            throw new BusinessException("Booking not found", 404);
+        // 4) update booking totals (optional now, لكن مفيد)
+        // Total = sum(UnitPrice + MaterialAdjustment) for not-cancelled items
+        // هنسيبها دلوقتي لمرحلة invoice recalculation أو تعملها هنا لو تحبي
 
-        var allItems = await itemRepo.FindAsync(i => i.BookingId == item.BookingId);
+        // 5) auto close booking (Done/Cancelled => Completed, all Cancelled => Cancelled)
+        await _closingService.TryAutoCloseBookingAsync(item.BookingId, save: false);
 
-        // ✅ condition: Done OR Cancelled
-        var completed = allItems.All(i =>
-            i.Id == item.Id
-                ? true
-                : (i.Status == BookingItemStatus.Done || i.Status == BookingItemStatus.Cancelled)
-        );
-
-        if (completed)
-        {
-            booking.Status = BookingStatus.Completed;
-            booking.CompletedAt = DateTime.UtcNow;
-            bookingRepo.Update(booking);
-        }
-
+        // ✅ ONE SAVE
         try
         {
             await _uow.SaveChangesAsync();
         }
         catch (DbUpdateConcurrencyException)
         {
-            throw new BusinessException("This service item was already updated by another employee. Please retry.", 409);
+            throw new BusinessException("This record was modified by another operation. Please retry.", 409);
         }
 
-        // ✅ after save: if booking completed -> create invoice (idempotent)
-        if (completed)
+        // بعد الحفظ: لو booking Completed -> ensure invoice
+        var freshBooking = await bookingRepo.GetByIdAsync(item.BookingId);
+        if (freshBooking != null && freshBooking.Status == BookingStatus.Completed)
         {
             await _invoiceService.EnsureInvoiceForBookingAsync(item.BookingId);
         }
 
         return MapItem(item);
     }
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 
 
     // ---------------- helpers ----------------
