@@ -745,7 +745,7 @@ namespace Forto.Application.Abstractions.Services.Bookings
 
     // ---------------- helpers ----------------
 
-    private async Task EnsureRatesExistForBodyType(List<int> serviceIds, CarBodyType bodyType)
+        private async Task EnsureRatesExistForBodyType(List<int> serviceIds, CarBodyType bodyType)
         {
             var rateRepo = _uow.Repository<ServiceRate>();
             var rates = await rateRepo.FindAsync(r => r.IsActive && serviceIds.Contains(r.ServiceId) && r.BodyType == bodyType);

@@ -10,6 +10,7 @@ using Forto.Application.Abstractions.Services.Invoices;
 using Forto.Application.DTOs.Billings;
 using Forto.Domain.Entities.Bookings;
 using Forto.Domain.Entities.Employees;
+using Forto.Domain.Entities.Ops;
 using Forto.Domain.Enum;
 using Microsoft.EntityFrameworkCore;
 
@@ -189,12 +190,92 @@ namespace Forto.Application.Abstractions.Services.Bookings.Admin
 
 
 
+
+
+        // Before Material
+        //public async Task CancelBookingItemAsync(int itemId, CashierActionRequest request)
+        //{
+        //    await RequireCashierAsync(request.CashierId);
+
+        //    var itemRepo = _uow.Repository<BookingItem>();
+        //    var bookingRepo = _uow.Repository<Booking>();
+
+        //    var item = await itemRepo.GetByIdAsync(itemId);
+        //    if (item == null)
+        //        throw new BusinessException("Booking item not found", 404);
+
+        //    if (item.Status == BookingItemStatus.Done)
+        //        throw new BusinessException("Cannot cancel a completed service (refund flow needed)", 409);
+
+        //    var inv = await _invoiceService.GetByBookingIdAsync(item.BookingId);
+        //    if (inv != null && inv.Status == InvoiceStatus.Paid)
+        //        throw new BusinessException("Cannot cancel after payment (refund flow needed)", 409);
+
+        //    // 1) Cancel item
+        //    item.Status = BookingItemStatus.Cancelled;
+        //    itemRepo.Update(item);
+
+
+        //    // 2) Update booking totals (NO SaveChanges)
+        //    await RecalculateBookingTotalsAsync(item.BookingId, save: false);
+
+        //    // 3) Auto close booking (NO SaveChanges)
+        //    await _closingService.TryAutoCloseBookingAsync(item.BookingId, save: false);
+
+        //    // اقرأ حالة البوكينج بعد التعديلات (من نفس context)
+        //    var booking = await bookingRepo.GetByIdAsync(item.BookingId);
+        //    if (booking == null)
+        //        throw new BusinessException("Booking not found", 404);
+
+        //    // 4) invoice logic based on booking status
+        //    if (booking.Status == BookingStatus.Cancelled)
+        //    {
+        //        // لا recalculation ولا ensure invoice
+        //    }
+        //    else
+        //    {
+        //        // لو عندك invoice موجودة Unpaid لازم تتعدل
+        //        // مهم: خليه save:false عشان ONE SAVE
+        //        await _invoiceService.RecalculateForBookingAsync(item.BookingId, save: false);
+        //    }
+
+        //    // ✅ ONE SAVE
+        //    try
+        //    {
+        //        await _uow.SaveChangesAsync();
+        //    }
+        //    catch (DbUpdateConcurrencyException)
+        //    {
+        //        throw new BusinessException("This booking was modified by another operation. Please retry.", 409);
+        //    }
+
+        //    // بعد ما حفظنا، لو البوكينج Completed اعمل invoice (لو مش موجودة)
+        //    if (booking.Status == BookingStatus.Completed)
+        //    {
+        //        await _invoiceService.EnsureInvoiceForBookingAsync(item.BookingId);
+        //    }
+        //}
+
+
+
+
+
+
+
+
+
+
+
+
+
         public async Task CancelBookingItemAsync(int itemId, CashierActionRequest request)
         {
             await RequireCashierAsync(request.CashierId);
 
             var itemRepo = _uow.Repository<BookingItem>();
             var bookingRepo = _uow.Repository<Booking>();
+            var usageRepo = _uow.Repository<BookingItemMaterialUsage>();
+            var stockRepo = _uow.Repository<BranchMaterialStock>();
 
             var item = await itemRepo.GetByIdAsync(itemId);
             if (item == null)
@@ -203,39 +284,85 @@ namespace Forto.Application.Abstractions.Services.Bookings.Admin
             if (item.Status == BookingItemStatus.Done)
                 throw new BusinessException("Cannot cancel a completed service (refund flow needed)", 409);
 
-            var inv = await _invoiceService.GetByBookingIdAsync(item.BookingId);
-            if (inv != null && inv.Status == InvoiceStatus.Paid)
-                throw new BusinessException("Cannot cancel after payment (refund flow needed)", 409);
-
-            // 1) Cancel item
-            item.Status = BookingItemStatus.Cancelled;
-            itemRepo.Update(item);
-
-
-            // 2) Update booking totals (NO SaveChanges)
-            await RecalculateBookingTotalsAsync(item.BookingId, save: false);
-
-            // 3) Auto close booking (NO SaveChanges)
-            await _closingService.TryAutoCloseBookingAsync(item.BookingId, save: false);
-
-            // اقرأ حالة البوكينج بعد التعديلات (من نفس context)
             var booking = await bookingRepo.GetByIdAsync(item.BookingId);
             if (booking == null)
                 throw new BusinessException("Booking not found", 404);
 
-            // 4) invoice logic based on booking status
-            if (booking.Status == BookingStatus.Cancelled)
+            // لو الفاتورة مدفوعة نمنع الإلغاء
+            var inv = await _invoiceService.GetByBookingIdAsync(item.BookingId);
+            if (inv != null && inv.Status == InvoiceStatus.Paid)
+                throw new BusinessException("Cannot cancel after payment (refund flow needed)", 409);
+
+            // ========= CASE 1: Pending =========
+            if (item.Status == BookingItemStatus.Pending)
             {
-                // لا recalculation ولا ensure invoice
-            }
-            else
-            {
-                // لو عندك invoice موجودة Unpaid لازم تتعدل
-                // مهم: خليه save:false عشان ONE SAVE
-                await _invoiceService.RecalculateForBookingAsync(item.BookingId, save: false);
+                item.Status = BookingItemStatus.Cancelled;
+                itemRepo.Update(item);
+
+                await _closingService.TryAutoCloseBookingAsync(item.BookingId, save: false);
+
+                await _uow.SaveChangesAsync();
+                return;
             }
 
-            // ✅ ONE SAVE
+            // ========= CASE 2: InProgress =========
+
+            // load usages tracking
+            var usages = await usageRepo.FindTrackingAsync(u => u.BookingItemId == item.Id);
+            if (usages.Count == 0)
+                throw new BusinessException("No material usage found for this item", 409);
+
+            // load branch stocks tracking
+            var materialIds = usages.Select(u => u.MaterialId).Distinct().ToList();
+            var stocks = await stockRepo.FindTrackingAsync(s =>
+                s.BranchId == booking.BranchId && materialIds.Contains(s.MaterialId));
+
+            var stockMap = stocks.ToDictionary(s => s.MaterialId, s => s);
+
+            // map overrides (لو الكاشير دخل أرقام)
+            var overrideMap = request.UsedOverride?
+                .ToDictionary(x => x.MaterialId, x => x.ActualQty)
+                ?? new Dictionary<int, decimal>();
+
+            foreach (var usage in usages)
+            {
+                if (!stockMap.TryGetValue(usage.MaterialId, out var stock))
+                    throw new BusinessException("Stock row missing for a material in this branch", 409);
+
+                // actual used = override OR current actual
+                var actualUsed = overrideMap.TryGetValue(usage.MaterialId, out var ov)
+                    ? Math.Max(0, ov)
+                    : usage.ActualQty;
+
+                // ==== خصم OnHand (Waste) ====
+                stock.OnHandQty -= actualUsed;
+                if (stock.OnHandQty < 0) stock.OnHandQty = 0;
+
+                // ==== فك الـ Reservation بالكامل ====
+                stock.ReservedQty -= usage.ReservedQty;
+                if (stock.ReservedQty < 0) stock.ReservedQty = 0;
+
+                stockRepo.Update(stock);
+
+                // update usage
+                usage.ActualQty = actualUsed;
+                usage.ReservedQty = 0;
+                usage.ExtraCharge = 0; // لا نحاسب العميل
+                usage.RecordedByEmployeeId = request.CashierId;
+                usage.RecordedAt = DateTime.UtcNow;
+
+                usageRepo.Update(usage);
+            }
+
+            // mark item cancelled
+            item.Status = BookingItemStatus.Cancelled;
+            item.MaterialAdjustment = 0; // ما فيش تحميل على العميل
+            itemRepo.Update(item);
+
+            // auto close booking (cancel / complete)
+            await _closingService.TryAutoCloseBookingAsync(item.BookingId, save: false);
+
+            // ========= ONE SAVE =========
             try
             {
                 await _uow.SaveChangesAsync();
@@ -244,13 +371,23 @@ namespace Forto.Application.Abstractions.Services.Bookings.Admin
             {
                 throw new BusinessException("This booking was modified by another operation. Please retry.", 409);
             }
-
-            // بعد ما حفظنا، لو البوكينج Completed اعمل invoice (لو مش موجودة)
-            if (booking.Status == BookingStatus.Completed)
-            {
-                await _invoiceService.EnsureInvoiceForBookingAsync(item.BookingId);
-            }
         }
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 
 
         public async Task CancelBookingAsync(int bookingId, CashierActionRequest request)
@@ -332,26 +469,26 @@ namespace Forto.Application.Abstractions.Services.Bookings.Admin
         }
 
 
-        private async Task RecalculateBookingTotalsAsync(int bookingId, bool save = true)
-        {
-            var bookingRepo = _uow.Repository<Booking>();
-            var itemRepo = _uow.Repository<BookingItem>();
+        //private async Task RecalculateBookingTotalsAsync(int bookingId, bool save = true)
+        //{
+        //    var bookingRepo = _uow.Repository<Booking>();
+        //    var itemRepo = _uow.Repository<BookingItem>();
 
-            var booking = await bookingRepo.GetByIdAsync(bookingId);
-            if (booking == null) return;
+        //    var booking = await bookingRepo.GetByIdAsync(bookingId);
+        //    if (booking == null) return;
 
-            var items = await itemRepo.FindAsync(i =>
-                i.BookingId == bookingId &&
-                i.Status != BookingItemStatus.Cancelled);
+        //    var items = await itemRepo.FindAsync(i =>
+        //        i.BookingId == bookingId &&
+        //        i.Status != BookingItemStatus.Cancelled);
 
-            booking.TotalPrice = items.Sum(i => i.UnitPrice);
-            booking.EstimatedDurationMinutes = items.Sum(i => i.DurationMinutes);
+        //    booking.TotalPrice = items.Sum(i => i.UnitPrice);
+        //    booking.EstimatedDurationMinutes = items.Sum(i => i.DurationMinutes);
 
-            bookingRepo.Update(booking);
+        //    bookingRepo.Update(booking);
 
-            if (save)
-                await _uow.SaveChangesAsync();
-        }
+        //    if (save)
+        //        await _uow.SaveChangesAsync();
+        //}
 
         //private async Task TryAutoCompleteBookingAsync(int bookingId, bool save = true)
         //{

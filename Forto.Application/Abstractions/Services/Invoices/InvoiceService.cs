@@ -5,20 +5,17 @@ using Forto.Domain.Entities.Billings;
 using Forto.Domain.Entities.Bookings;
 using Forto.Domain.Entities.Employees;
 using Forto.Domain.Enum;
-using Microsoft.EntityFrameworkCore;
-using System;
-using System.Collections.Generic;
-using System.Linq;
-using System.Text;
-using System.Threading.Tasks;
 
 namespace Forto.Application.Abstractions.Services.Invoices
 {
     public class InvoiceService : IInvoiceService
     {
+                
         private readonly IUnitOfWork _uow;
 
+
         public InvoiceService(IUnitOfWork uow) => _uow = uow;
+
 
         public async Task<InvoiceResponse?> GetByBookingIdAsync(int bookingId)
         {
@@ -34,7 +31,6 @@ namespace Forto.Application.Abstractions.Services.Invoices
 
             return Map(inv);
         }
-
 
 
         //public async Task<InvoiceResponse> EnsureInvoiceForBookingAsync(int bookingId)
@@ -103,11 +99,6 @@ namespace Forto.Application.Abstractions.Services.Invoices
         //}
 
 
-
-
-
-
-
         public async Task<InvoiceResponse> EnsureInvoiceForBookingAsync(int bookingId)
         {
             var bookingRepo = _uow.Repository<Booking>();
@@ -161,7 +152,7 @@ namespace Forto.Application.Abstractions.Services.Invoices
                 await lineRepo.AddAsync(new InvoiceLine
                 {
                     InvoiceId = invoice.Id,
-                    Description = $"Service #{it.ServiceId}",
+                    Description = $"Service #{it.ServiceId} #{it.Service?.Name}",
                     Qty = 1,
                     UnitPrice = it.UnitPrice,
                     Total = lineTotal
@@ -175,26 +166,6 @@ namespace Forto.Application.Abstractions.Services.Invoices
 
             return Map(invoice);
         }
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
 
 
         //public async Task RecalculateForBookingAsync(int bookingId)
@@ -352,7 +323,6 @@ namespace Forto.Application.Abstractions.Services.Invoices
         //}
 
 
-
         public async Task RecalculateForBookingAsync(int bookingId, bool save = true)
         {
             var invRepo = _uow.Repository<Invoice>();
@@ -414,7 +384,6 @@ namespace Forto.Application.Abstractions.Services.Invoices
         }
 
 
-
         public async Task<InvoiceResponse> PayCashAsync(int invoiceId, int cashierId)
         {
             // check cashier role
@@ -452,6 +421,7 @@ namespace Forto.Application.Abstractions.Services.Invoices
             return Map(inv);
         }
 
+
         private static InvoiceResponse Map(Invoice inv) => new()
         {
             Id = inv.Id,
@@ -472,5 +442,7 @@ namespace Forto.Application.Abstractions.Services.Invoices
                 Total = l.Total
             }).ToList()
         };
+    
+        
     }
 }
