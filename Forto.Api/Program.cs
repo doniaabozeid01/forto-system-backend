@@ -17,6 +17,7 @@ using Forto.Application.Abstractions.Services.Inventory.Materials;
 using Forto.Application.Abstractions.Services.Inventory.MaterialsCheck;
 using Forto.Application.Abstractions.Services.Invoices;
 using Forto.Application.Abstractions.Services.Ops.Stock;
+using Forto.Application.Abstractions.Services.Ops.Stock.StockMovement;
 using Forto.Application.Abstractions.Services.Ops.Usage;
 using Forto.Application.Abstractions.Services.Schedule;
 using Forto.Application.Abstractions.Services.Shift;
@@ -99,6 +100,7 @@ namespace Forto.Api
             builder.Services.AddScoped<IMaterialsCheckService, MaterialsCheckService>();
             builder.Services.AddScoped<IBookingItemMaterialsService, BookingItemMaterialsService>();
             builder.Services.AddScoped<IBookingClosingService, BookingClosingService>();
+            builder.Services.AddScoped<IStockMovementService, StockMovementService>();
 
 
             // Learn more about configuring Swagger/OpenAPI at https://aka.ms/aspnetcore/swashbuckle

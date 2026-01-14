@@ -169,10 +169,10 @@ namespace Forto.Infrastructure.Data
 
 
             modelBuilder.Entity<Booking>()
-    .HasOne(b => b.Client)
-    .WithMany()
-    .HasForeignKey(b => b.ClientId)
-    .OnDelete(DeleteBehavior.Restrict); // أو NoAction
+                .HasOne(b => b.Client)
+                .WithMany()
+                .HasForeignKey(b => b.ClientId)
+                .OnDelete(DeleteBehavior.Restrict); // أو NoAction
 
             modelBuilder.Entity<Booking>()
                 .HasOne(b => b.Car)
@@ -357,6 +357,51 @@ namespace Forto.Infrastructure.Data
                 .HasForeignKey(x => x.MaterialId)
                 .OnDelete(DeleteBehavior.NoAction);
 
+
+
+
+
+
+
+
+
+
+            modelBuilder.Entity<MaterialMovement>().ToTable("MaterialMovements", "ops");
+
+            modelBuilder.Entity<MaterialMovement>()
+                .Property(x => x.MovementType)
+                .HasConversion<int>();
+
+            modelBuilder.Entity<MaterialMovement>()
+                .Property(x => x.Qty)
+                .HasPrecision(18, 3);
+
+            modelBuilder.Entity<MaterialMovement>()
+                .Property(x => x.UnitCostSnapshot)
+                .HasPrecision(18, 3);
+
+            modelBuilder.Entity<MaterialMovement>()
+                .Property(x => x.TotalCost)
+                .HasPrecision(18, 3);
+
+            modelBuilder.Entity<MaterialMovement>()
+                .HasIndex(x => new { x.BranchId, x.OccurredAt });
+
+            modelBuilder.Entity<MaterialMovement>()
+                .HasIndex(x => new { x.MaterialId, x.OccurredAt });
+
+            // علاقات بدون Cascade
+            modelBuilder.Entity<MaterialMovement>()
+                .HasOne(x => x.Branch)
+                .WithMany()
+                .HasForeignKey(x => x.BranchId)
+                .OnDelete(DeleteBehavior.NoAction);
+
+            modelBuilder.Entity<MaterialMovement>()
+                .HasOne(x => x.Material)
+                .WithMany()
+                .HasForeignKey(x => x.MaterialId)
+                .OnDelete(DeleteBehavior.NoAction);
 
         }
 
