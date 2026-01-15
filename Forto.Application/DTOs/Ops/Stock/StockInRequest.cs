@@ -19,7 +19,7 @@ namespace Forto.Application.DTOs.Ops.Stock
         public decimal Qty { get; set; }
 
         [Range(0, 100000000)]
-        public decimal UnitCost { get; set; } // تكلفة الشراء
+        public decimal? UnitCost { get; set; } // تكلفة الشراء
 
         public string? Notes { get; set; }
         public DateTime? OccurredAt { get; set; } // لو null هنستخدم now

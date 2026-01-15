@@ -267,6 +267,128 @@ namespace Forto.Application.Abstractions.Services.Bookings.Admin
 
 
 
+        // before material movements
+        //public async Task CancelBookingItemAsync(int itemId, CashierActionRequest request)
+        //{
+        //    await RequireCashierAsync(request.CashierId);
+
+        //    var itemRepo = _uow.Repository<BookingItem>();
+        //    var bookingRepo = _uow.Repository<Booking>();
+        //    var usageRepo = _uow.Repository<BookingItemMaterialUsage>();
+        //    var stockRepo = _uow.Repository<BranchMaterialStock>();
+
+        //    var item = await itemRepo.GetByIdAsync(itemId);
+        //    if (item == null)
+        //        throw new BusinessException("Booking item not found", 404);
+
+        //    if (item.Status == BookingItemStatus.Done)
+        //        throw new BusinessException("Cannot cancel a completed service (refund flow needed)", 409);
+
+        //    var booking = await bookingRepo.GetByIdAsync(item.BookingId);
+        //    if (booking == null)
+        //        throw new BusinessException("Booking not found", 404);
+
+        //    // لو الفاتورة مدفوعة نمنع الإلغاء
+        //    var inv = await _invoiceService.GetByBookingIdAsync(item.BookingId);
+        //    if (inv != null && inv.Status == InvoiceStatus.Paid)
+        //        throw new BusinessException("Cannot cancel after payment (refund flow needed)", 409);
+
+        //    // ========= CASE 1: Pending =========
+        //    if (item.Status == BookingItemStatus.Pending)
+        //    {
+        //        item.Status = BookingItemStatus.Cancelled;
+        //        itemRepo.Update(item);
+
+        //        await _closingService.TryAutoCloseBookingAsync(item.BookingId, save: false);
+
+        //        await _uow.SaveChangesAsync();
+        //        return;
+        //    }
+
+        //    // ========= CASE 2: InProgress =========
+
+        //    // load usages tracking
+        //    var usages = await usageRepo.FindTrackingAsync(u => u.BookingItemId == item.Id);
+        //    if (usages.Count == 0)
+        //        throw new BusinessException("No material usage found for this item", 409);
+
+        //    // load branch stocks tracking
+        //    var materialIds = usages.Select(u => u.MaterialId).Distinct().ToList();
+        //    var stocks = await stockRepo.FindTrackingAsync(s =>
+        //        s.BranchId == booking.BranchId && materialIds.Contains(s.MaterialId));
+
+        //    var stockMap = stocks.ToDictionary(s => s.MaterialId, s => s);
+
+        //    // map overrides (لو الكاشير دخل أرقام)
+        //    var overrideMap = request.UsedOverride?
+        //        .ToDictionary(x => x.MaterialId, x => x.ActualQty)
+        //        ?? new Dictionary<int, decimal>();
+
+        //    foreach (var usage in usages)
+        //    {
+        //        if (!stockMap.TryGetValue(usage.MaterialId, out var stock))
+        //            throw new BusinessException("Stock row missing for a material in this branch", 409);
+
+        //        // actual used = override OR current actual
+        //        var actualUsed = overrideMap.TryGetValue(usage.MaterialId, out var ov)
+        //            ? Math.Max(0, ov)
+        //            : usage.ActualQty;
+
+        //        // ==== خصم OnHand (Waste) ====
+        //        stock.OnHandQty -= actualUsed;
+        //        if (stock.OnHandQty < 0) stock.OnHandQty = 0;
+
+        //        // ==== فك الـ Reservation بالكامل ====
+        //        stock.ReservedQty -= usage.ReservedQty;
+        //        if (stock.ReservedQty < 0) stock.ReservedQty = 0;
+
+        //        stockRepo.Update(stock);
+
+        //        // update usage
+        //        usage.ActualQty = actualUsed;
+        //        usage.ReservedQty = 0;
+        //        usage.ExtraCharge = 0; // لا نحاسب العميل
+        //        usage.RecordedByEmployeeId = request.CashierId;
+        //        usage.RecordedAt = DateTime.UtcNow;
+
+        //        usageRepo.Update(usage);
+        //    }
+
+        //    // mark item cancelled
+        //    item.Status = BookingItemStatus.Cancelled;
+        //    item.MaterialAdjustment = 0; // ما فيش تحميل على العميل
+        //    itemRepo.Update(item);
+
+        //    // auto close booking (cancel / complete)
+        //    await _closingService.TryAutoCloseBookingAsync(item.BookingId, save: false);
+
+        //    // ========= ONE SAVE =========
+        //    try
+        //    {
+        //        await _uow.SaveChangesAsync();
+        //    }
+        //    catch (DbUpdateConcurrencyException)
+        //    {
+        //        throw new BusinessException("This booking was modified by another operation. Please retry.", 409);
+        //    }
+        //}
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 
         public async Task CancelBookingItemAsync(int itemId, CashierActionRequest request)
         {
@@ -276,6 +398,7 @@ namespace Forto.Application.Abstractions.Services.Bookings.Admin
             var bookingRepo = _uow.Repository<Booking>();
             var usageRepo = _uow.Repository<BookingItemMaterialUsage>();
             var stockRepo = _uow.Repository<BranchMaterialStock>();
+            var movementRepo = _uow.Repository<MaterialMovement>();
 
             var item = await itemRepo.GetByIdAsync(itemId);
             if (item == null)
@@ -288,7 +411,6 @@ namespace Forto.Application.Abstractions.Services.Bookings.Admin
             if (booking == null)
                 throw new BusinessException("Booking not found", 404);
 
-            // لو الفاتورة مدفوعة نمنع الإلغاء
             var inv = await _invoiceService.GetByBookingIdAsync(item.BookingId);
             if (inv != null && inv.Status == InvoiceStatus.Paid)
                 throw new BusinessException("Cannot cancel after payment (refund flow needed)", 409);
@@ -306,30 +428,36 @@ namespace Forto.Application.Abstractions.Services.Bookings.Admin
             }
 
             // ========= CASE 2: InProgress =========
-
-            // load usages tracking
             var usages = await usageRepo.FindTrackingAsync(u => u.BookingItemId == item.Id);
             if (usages.Count == 0)
                 throw new BusinessException("No material usage found for this item", 409);
 
-            // load branch stocks tracking
             var materialIds = usages.Select(u => u.MaterialId).Distinct().ToList();
+
             var stocks = await stockRepo.FindTrackingAsync(s =>
                 s.BranchId == booking.BranchId && materialIds.Contains(s.MaterialId));
 
             var stockMap = stocks.ToDictionary(s => s.MaterialId, s => s);
 
-            // map overrides (لو الكاشير دخل أرقام)
+            // ✅ Idempotency: لو waste اتسجل قبل كده لنفس item/material متسجلش تاني
+            var existingWaste = await movementRepo.FindAsync(m =>
+                m.BookingItemId == item.Id &&
+                m.MovementType == MaterialMovementType.Waste);
+
+            var alreadyLogged = existingWaste.Select(m => m.MaterialId).ToHashSet();
+
+            // overrides
             var overrideMap = request.UsedOverride?
                 .ToDictionary(x => x.MaterialId, x => x.ActualQty)
                 ?? new Dictionary<int, decimal>();
+
+            var occurredAt = DateTime.UtcNow;
 
             foreach (var usage in usages)
             {
                 if (!stockMap.TryGetValue(usage.MaterialId, out var stock))
                     throw new BusinessException("Stock row missing for a material in this branch", 409);
 
-                // actual used = override OR current actual
                 var actualUsed = overrideMap.TryGetValue(usage.MaterialId, out var ov)
                     ? Math.Max(0, ov)
                     : usage.ActualQty;
@@ -344,25 +472,41 @@ namespace Forto.Application.Abstractions.Services.Bookings.Admin
 
                 stockRepo.Update(stock);
 
-                // update usage
+                // update usage (freeze it)
                 usage.ActualQty = actualUsed;
                 usage.ReservedQty = 0;
                 usage.ExtraCharge = 0; // لا نحاسب العميل
                 usage.RecordedByEmployeeId = request.CashierId;
-                usage.RecordedAt = DateTime.UtcNow;
-
+                usage.RecordedAt = occurredAt;
                 usageRepo.Update(usage);
+
+                // ✅ سجل Waste movement (مرة واحدة فقط)
+                if (!alreadyLogged.Contains(usage.MaterialId) && actualUsed > 0)
+                {
+                    await movementRepo.AddAsync(new MaterialMovement
+                    {
+                        BranchId = booking.BranchId,
+                        MaterialId = usage.MaterialId,
+                        MovementType = MaterialMovementType.Waste,
+                        Qty = actualUsed,
+                        UnitCostSnapshot = usage.UnitCost,
+                        TotalCost = actualUsed * usage.UnitCost,
+                        OccurredAt = occurredAt,
+                        BookingId = booking.Id,
+                        BookingItemId = item.Id,
+                        RecordedByEmployeeId = request.CashierId,
+                        Notes = request.Reason
+                    });
+                }
             }
 
             // mark item cancelled
             item.Status = BookingItemStatus.Cancelled;
-            item.MaterialAdjustment = 0; // ما فيش تحميل على العميل
+            item.MaterialAdjustment = 0;
             itemRepo.Update(item);
 
-            // auto close booking (cancel / complete)
             await _closingService.TryAutoCloseBookingAsync(item.BookingId, save: false);
 
-            // ========= ONE SAVE =========
             try
             {
                 await _uow.SaveChangesAsync();
@@ -372,6 +516,11 @@ namespace Forto.Application.Abstractions.Services.Bookings.Admin
                 throw new BusinessException("This booking was modified by another operation. Please retry.", 409);
             }
         }
+
+
+
+
+
 
 
 

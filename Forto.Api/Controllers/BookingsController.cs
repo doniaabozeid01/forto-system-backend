@@ -60,6 +60,9 @@ namespace Forto.Api.Controllers
             return OkResponse(new { bookingId }, "Booking completed");
         }
 
+
+
+
         [HttpPost("{bookingId:int}/cancel")]
         public async Task<IActionResult> CancelBooking(int bookingId, [FromBody] CashierActionRequest request)
         {

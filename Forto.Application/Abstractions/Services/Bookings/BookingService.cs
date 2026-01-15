@@ -621,112 +621,263 @@ namespace Forto.Application.Abstractions.Services.Bookings
 
 
 
-        // after material
-        public async Task<BookingItemResponse> CompleteItemAsync(int itemId, int employeeId)
-    {
-        var itemRepo = _uow.Repository<BookingItem>();
-        var bookingRepo = _uow.Repository<Booking>();
-        var usageRepo = _uow.Repository<BookingItemMaterialUsage>();
-        var stockRepo = _uow.Repository<BranchMaterialStock>();
+        // after material and before material movements
 
-        var item = await itemRepo.GetByIdAsync(itemId);
-        if (item == null) throw new BusinessException("Booking item not found", 404);
 
-        if (item.Status != BookingItemStatus.InProgress)
-            throw new BusinessException("Item cannot be completed in its current status", 409);
 
-        if (item.AssignedEmployeeId != employeeId)
-            throw new BusinessException("Only the assigned employee can complete this item", 403);
+        //    public async Task<BookingItemResponse> CompleteItemAsync(int itemId, int employeeId)
+        //{
+        //    var itemRepo = _uow.Repository<BookingItem>();
+        //    var bookingRepo = _uow.Repository<Booking>();
+        //    var usageRepo = _uow.Repository<BookingItemMaterialUsage>();
+        //    var stockRepo = _uow.Repository<BranchMaterialStock>();
 
-        var booking = await bookingRepo.GetByIdAsync(item.BookingId);
-        if (booking == null) throw new BusinessException("Booking not found", 404);
+        //    var item = await itemRepo.GetByIdAsync(itemId);
+        //    if (item == null) throw new BusinessException("Booking item not found", 404);
 
-        var branchId = booking.BranchId;
+        //    if (item.Status != BookingItemStatus.InProgress)
+        //        throw new BusinessException("Item cannot be completed in its current status", 409);
 
-        // ✅ load usages tracking
-        var usages = await usageRepo.FindTrackingAsync(u => u.BookingItemId == item.Id);
-        if (usages.Count == 0)
-            throw new BusinessException("No reserved materials found for this item (start it first)", 409);
+        //    if (item.AssignedEmployeeId != employeeId)
+        //        throw new BusinessException("Only the assigned employee can complete this item", 403);
 
-        var materialIds = usages.Select(u => u.MaterialId).Distinct().ToList();
+        //    var booking = await bookingRepo.GetByIdAsync(item.BookingId);
+        //    if (booking == null) throw new BusinessException("Booking not found", 404);
 
-        // ✅ load stocks tracking
-        var stocks = await stockRepo.FindTrackingAsync(s => s.BranchId == branchId && materialIds.Contains(s.MaterialId));
-        var stockMap = stocks.ToDictionary(s => s.MaterialId, s => s);
+        //    var branchId = booking.BranchId;
 
-        // 1) final check + consume + release reserved
-        foreach (var u in usages)
+        //    // ✅ load usages tracking
+        //    var usages = await usageRepo.FindTrackingAsync(u => u.BookingItemId == item.Id);
+        //    if (usages.Count == 0)
+        //        throw new BusinessException("No reserved materials found for this item (start it first)", 409);
+
+        //    var materialIds = usages.Select(u => u.MaterialId).Distinct().ToList();
+
+        //    // ✅ load stocks tracking
+        //    var stocks = await stockRepo.FindTrackingAsync(s => s.BranchId == branchId && materialIds.Contains(s.MaterialId));
+        //    var stockMap = stocks.ToDictionary(s => s.MaterialId, s => s);
+
+        //    // 1) final check + consume + release reserved
+        //    foreach (var u in usages)
+        //    {
+        //        if (!stockMap.TryGetValue(u.MaterialId, out var stock))
+        //            throw new BusinessException("Stock row missing for a material in this branch", 409);
+
+        //        // available if we release this item's reserved first:
+        //        // availableNow = onHand - reserved + u.ReservedQty
+        //        var availableNow = stock.OnHandQty - stock.ReservedQty + u.ReservedQty;
+        //        if (availableNow < 0) availableNow = 0;
+
+        //        if (availableNow < u.ActualQty)
+        //        {
+        //            throw new BusinessException("Not enough stock to complete this service", 409,
+        //                new Dictionary<string, string[]>
+        //                {
+        //                    ["materials"] = new[]
+        //                    {
+        //                    $"MaterialId={u.MaterialId}: need {u.ActualQty}, available {availableNow}"
+        //                    }
+        //                });
+        //        }
+
+        //        // release reservation
+        //        stock.ReservedQty -= u.ReservedQty;
+        //        if (stock.ReservedQty < 0) stock.ReservedQty = 0;
+
+        //        // consume actual
+        //        stock.OnHandQty -= u.ActualQty;
+        //        if (stock.OnHandQty < 0) stock.OnHandQty = 0; // safety, but check above should prevent
+
+        //        stockRepo.Update(stock);
+
+        //        // optional: mark reservation released at usage row level
+        //        u.ReservedQty = 0;
+        //        usageRepo.Update(u);
+        //    }
+
+        //    // 2) compute total adjustment for this item
+        //    var adjustment = usages.Sum(u => u.ExtraCharge); // now can be +/-
+        //    item.MaterialAdjustment = adjustment;
+
+        //    // 3) set done
+        //    item.Status = BookingItemStatus.Done;
+        //    item.CompletedAt = DateTime.UtcNow;
+        //    itemRepo.Update(item);
+
+        //    // 4) update booking totals (optional now, لكن مفيد)
+        //    // Total = sum(UnitPrice + MaterialAdjustment) for not-cancelled items
+        //    // هنسيبها دلوقتي لمرحلة invoice recalculation أو تعملها هنا لو تحبي
+
+        //    // 5) auto close booking (Done/Cancelled => Completed, all Cancelled => Cancelled)
+        //    await _closingService.TryAutoCloseBookingAsync(item.BookingId, save: false);
+
+        //    // ✅ ONE SAVE
+        //    try
+        //    {
+        //        await _uow.SaveChangesAsync();
+        //    }
+        //    catch (DbUpdateConcurrencyException)
+        //    {
+        //        throw new BusinessException("This record was modified by another operation. Please retry.", 409);
+        //    }
+
+        //    // بعد الحفظ: لو booking Completed -> ensure invoice
+        //    var freshBooking = await bookingRepo.GetByIdAsync(item.BookingId);
+        //    if (freshBooking != null && freshBooking.Status == BookingStatus.Completed)
+        //    {
+        //        await _invoiceService.EnsureInvoiceForBookingAsync(item.BookingId);
+        //    }
+
+        //    return MapItem(item);
+        //}
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+        public async Task<BookingItemResponse> CompleteItemAsync (int itemId, int employeeId)
         {
-            if (!stockMap.TryGetValue(u.MaterialId, out var stock))
-                throw new BusinessException("Stock row missing for a material in this branch", 409);
+            var itemRepo = _uow.Repository<BookingItem>();
+            var bookingRepo = _uow.Repository<Booking>();
+            var usageRepo = _uow.Repository<BookingItemMaterialUsage>();
+            var stockRepo = _uow.Repository<BranchMaterialStock>();
+            var movementRepo = _uow.Repository<MaterialMovement>();
 
-            // available if we release this item's reserved first:
-            // availableNow = onHand - reserved + u.ReservedQty
-            var availableNow = stock.OnHandQty - stock.ReservedQty + u.ReservedQty;
-            if (availableNow < 0) availableNow = 0;
+            var item = await itemRepo.GetByIdAsync(itemId);
+            if (item == null) throw new BusinessException("Booking item not found", 404);
 
-            if (availableNow < u.ActualQty)
+            if (item.Status != BookingItemStatus.InProgress)
+                throw new BusinessException("Item cannot be completed in its current status", 409);
+
+            if (item.AssignedEmployeeId != employeeId)
+                throw new BusinessException("Only the assigned employee can complete this item", 403);
+
+            var booking = await bookingRepo.GetByIdAsync(item.BookingId);
+            if (booking == null) throw new BusinessException("Booking not found", 404);
+
+            var branchId = booking.BranchId;
+
+            // ✅ load usages tracking
+            var usages = await usageRepo.FindTrackingAsync(u => u.BookingItemId == item.Id);
+            if (usages.Count == 0)
+                throw new BusinessException("No reserved materials found for this item (start it first)", 409);
+
+            var materialIds = usages.Select(u => u.MaterialId).Distinct().ToList();
+
+            // ✅ load stocks tracking
+            var stocks = await stockRepo.FindTrackingAsync(s => s.BranchId == branchId && materialIds.Contains(s.MaterialId));
+            var stockMap = stocks.ToDictionary(s => s.MaterialId, s => s);
+
+            // ✅ Idempotency: لو movements اتسجلت قبل كده لنفس item/material -> متضيفهاش تاني
+            // (يحميك من retry / double request)
+            var existingConsume = await movementRepo.FindAsync(m =>
+                m.BookingItemId == item.Id &&
+                m.MovementType == MaterialMovementType.Consume);
+
+            var alreadyLogged = existingConsume
+                .Select(m => m.MaterialId)
+                .ToHashSet();
+
+            var occurredAt = DateTime.UtcNow;
+
+            // 1) final check + consume + release reserved + record movements
+            foreach (var u in usages)
             {
-                throw new BusinessException("Not enough stock to complete this service", 409,
-                    new Dictionary<string, string[]>
-                    {
-                        ["materials"] = new[]
+                if (!stockMap.TryGetValue(u.MaterialId, out var stock))
+                    throw new BusinessException("Stock row missing for a material in this branch", 409);
+
+                // available if we release this item's reserved first:
+                var availableNow = stock.OnHandQty - stock.ReservedQty + u.ReservedQty;
+                if (availableNow < 0) availableNow = 0;
+
+                if (availableNow < u.ActualQty)
+                {
+                    throw new BusinessException("Not enough stock to complete this service", 409,
+                        new Dictionary<string, string[]>
                         {
+                            ["materials"] = new[]
+                            {
                         $"MaterialId={u.MaterialId}: need {u.ActualQty}, available {availableNow}"
-                        }
+                            }
+                        });
+                }
+
+                // ✅ release reservation in branch stock
+                stock.ReservedQty -= u.ReservedQty;
+                if (stock.ReservedQty < 0) stock.ReservedQty = 0;
+
+                // ✅ consume actual from onhand
+                stock.OnHandQty -= u.ActualQty;
+                if (stock.OnHandQty < 0) stock.OnHandQty = 0;
+
+                stockRepo.Update(stock);
+
+                // optional: mark reservation released at usage row level
+                u.ReservedQty = 0;
+                usageRepo.Update(u);
+
+                // ✅ record movement (CONSUME) once
+                if (!alreadyLogged.Contains(u.MaterialId) && u.ActualQty > 0)
+                {
+                    await movementRepo.AddAsync(new MaterialMovement
+                    {
+                        BranchId = branchId,
+                        MaterialId = u.MaterialId,
+                        MovementType = MaterialMovementType.Consume,
+                        Qty = u.ActualQty,
+                        UnitCostSnapshot = u.UnitCost,
+                        TotalCost = u.ActualQty * u.UnitCost,
+                        OccurredAt = occurredAt,
+                        BookingId = booking.Id,
+                        BookingItemId = item.Id,
+                        RecordedByEmployeeId = employeeId,
+                        Notes = "Consume on complete"
                     });
+                }
             }
 
-            // release reservation
-            stock.ReservedQty -= u.ReservedQty;
-            if (stock.ReservedQty < 0) stock.ReservedQty = 0;
+            // 2) compute total adjustment for this item (can be +/-)
+            var adjustment = usages.Sum(u => u.ExtraCharge);
+            item.MaterialAdjustment = adjustment;
 
-            // consume actual
-            stock.OnHandQty -= u.ActualQty;
-            if (stock.OnHandQty < 0) stock.OnHandQty = 0; // safety, but check above should prevent
+            // 3) set done
+            item.Status = BookingItemStatus.Done;
+            item.CompletedAt = occurredAt;
+            itemRepo.Update(item);
 
-            stockRepo.Update(stock);
+            // 4) auto close booking (Completed/Cancelled)
+            await _closingService.TryAutoCloseBookingAsync(item.BookingId, save: false);
 
-            // optional: mark reservation released at usage row level
-            u.ReservedQty = 0;
-            usageRepo.Update(u);
+            // ✅ ONE SAVE
+            try
+            {
+                await _uow.SaveChangesAsync();
+            }
+            catch (DbUpdateConcurrencyException)
+            {
+                throw new BusinessException("This record was modified by another operation. Please retry.", 409);
+            }
+
+            // بعد الحفظ: لو booking Completed -> ensure invoice
+            var freshBooking = await bookingRepo.GetByIdAsync(item.BookingId);
+            if (freshBooking != null && freshBooking.Status == BookingStatus.Completed)
+            {
+                await _invoiceService.EnsureInvoiceForBookingAsync(item.BookingId);
+            }
+
+            return MapItem(item);
         }
 
-        // 2) compute total adjustment for this item
-        var adjustment = usages.Sum(u => u.ExtraCharge); // now can be +/-
-        item.MaterialAdjustment = adjustment;
-
-        // 3) set done
-        item.Status = BookingItemStatus.Done;
-        item.CompletedAt = DateTime.UtcNow;
-        itemRepo.Update(item);
-
-        // 4) update booking totals (optional now, لكن مفيد)
-        // Total = sum(UnitPrice + MaterialAdjustment) for not-cancelled items
-        // هنسيبها دلوقتي لمرحلة invoice recalculation أو تعملها هنا لو تحبي
-
-        // 5) auto close booking (Done/Cancelled => Completed, all Cancelled => Cancelled)
-        await _closingService.TryAutoCloseBookingAsync(item.BookingId, save: false);
-
-        // ✅ ONE SAVE
-        try
-        {
-            await _uow.SaveChangesAsync();
-        }
-        catch (DbUpdateConcurrencyException)
-        {
-            throw new BusinessException("This record was modified by another operation. Please retry.", 409);
-        }
-
-        // بعد الحفظ: لو booking Completed -> ensure invoice
-        var freshBooking = await bookingRepo.GetByIdAsync(item.BookingId);
-        if (freshBooking != null && freshBooking.Status == BookingStatus.Completed)
-        {
-            await _invoiceService.EnsureInvoiceForBookingAsync(item.BookingId);
-        }
-
-        return MapItem(item);
-    }
 
 
 
@@ -737,13 +888,7 @@ namespace Forto.Application.Abstractions.Services.Bookings
 
 
 
-
-
-
-
-
-
-    // ---------------- helpers ----------------
+        // ---------------- helpers ----------------
 
         private async Task EnsureRatesExistForBodyType(List<int> serviceIds, CarBodyType bodyType)
         {
