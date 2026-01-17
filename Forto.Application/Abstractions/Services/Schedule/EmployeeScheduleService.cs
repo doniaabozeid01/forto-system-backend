@@ -200,5 +200,43 @@ namespace Forto.Application.Abstractions.Services.Schedule
             // رجّع الجدول بعد التعديل
             return await GetWeekAsync(employeeId);
         }
+
+
+        public async Task<bool> IsEmployeeWorkingAsync(int employeeId, DateTime dateTime)
+        {
+            var dow = dateTime.DayOfWeek;
+            var hour = TimeOnly.FromDateTime(dateTime);
+
+            var scheduleRepo = _uow.Repository<EmployeeWorkSchedule>();
+            var schedules = await scheduleRepo.FindAsync(s =>
+                s.EmployeeId == employeeId &&
+                s.DayOfWeek == dow &&
+                !s.IsOff);
+
+            if (schedules.Count == 0) return false;
+
+            var schedule = schedules.First();
+
+            TimeOnly? start = schedule.StartTime;
+            TimeOnly? end = schedule.EndTime;
+
+            if (schedule.ShiftId.HasValue)
+            {
+                var shiftRepo = _uow.Repository<Domain.Entities.Employees.Shift>();
+                var shift = await shiftRepo.GetByIdAsync(schedule.ShiftId.Value);
+                if (shift != null)
+                {
+                    start ??= shift.StartTime;
+                    end ??= shift.EndTime;
+                }
+            }
+
+            if (start == null || end == null) return false;
+
+            // MVP: shift لا يعبر منتصف الليل
+            return hour >= start.Value && hour < end.Value;
+        }
     }
+
+
 }

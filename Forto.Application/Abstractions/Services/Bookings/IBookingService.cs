@@ -18,6 +18,7 @@ namespace Forto.Application.Abstractions.Services.Bookings
         Task<BookingItemResponse> StartItemAsync(int itemId, int employeeId);
         Task<BookingItemResponse> CompleteItemAsync(int itemId, int employeeId);
 
+        Task<BookingResponse> QuickCreateAsync(QuickCreateBookingRequest request);
 
 
 

@@ -35,6 +35,20 @@ namespace Forto.Api.Controllers
             return CreatedResponse(data, "Booking created");
         }
 
+
+
+
+        [HttpPost("quick-create")]
+        public async Task<IActionResult> QuickCreate([FromBody] QuickCreateBookingRequest request)
+        {
+            var data = await _service.QuickCreateAsync(request);
+            return CreatedResponse(data, "Booking created");
+        }
+
+
+
+
+
         [HttpGet("{id:int}")]
         public async Task<IActionResult> GetById(int id)
         {

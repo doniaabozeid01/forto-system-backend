@@ -11,5 +11,7 @@ namespace Forto.Application.Abstractions.Services.Schedule
     {
         Task<EmployeeScheduleResponse> UpsertWeekAsync(int employeeId, UpsertEmployeeScheduleRequest request);
         Task<EmployeeScheduleResponse> GetWeekAsync(int employeeId);
+        Task<bool> IsEmployeeWorkingAsync(int employeeId, DateTime dateTime);
+
     }
 }

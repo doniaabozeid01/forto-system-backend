@@ -17,6 +17,7 @@ using Forto.Application.Abstractions.Services.Invoices;
 using Forto.Application.DTOs.Billings;
 using Forto.Domain.Entities.Inventory;
 using Forto.Application.Abstractions.Services.Bookings.Closing;
+using Forto.Application.Abstractions.Services.Schedule;
 
 namespace Forto.Application.Abstractions.Services.Bookings
 {
@@ -25,10 +26,12 @@ namespace Forto.Application.Abstractions.Services.Bookings
         private readonly IUnitOfWork _uow;
         readonly IInvoiceService _invoiceService;
         private readonly IBookingClosingService _closingService;
+        private readonly IEmployeeScheduleService _scheduleService;
 
-        public BookingService(IUnitOfWork uow, IInvoiceService invoiceService, IBookingClosingService closingService) {
+        public BookingService(IUnitOfWork uow, IInvoiceService invoiceService, IBookingClosingService closingService, IEmployeeScheduleService scheduleService) {
             _invoiceService = invoiceService;
             _closingService = closingService;
+            _scheduleService = scheduleService;
             _uow = uow;
         }
 
@@ -733,6 +736,120 @@ namespace Forto.Application.Abstractions.Services.Bookings
 
 
 
+        public async Task<BookingResponse> QuickCreateAsync(QuickCreateBookingRequest request)
+        {
+            // 0) normalize
+            var phone = request.Client.PhoneNumber.Trim();
+            var plate = request.Car.PlateNumber.Trim().ToUpperInvariant();
+
+            // 1) Get or create client by phone
+            var clientRepo = _uow.Repository<Client>();
+            var clients = await clientRepo.FindAsync(c => c.PhoneNumber == phone);
+            var client = clients.FirstOrDefault();
+
+            if (client == null)
+            {
+                client = new Client
+                {
+                    PhoneNumber = phone,
+                    FullName = (request.Client.FullName ?? "New Client").Trim(),
+                    Email = request.Client.Email?.Trim(),
+                    IsActive = true
+                };
+                await clientRepo.AddAsync(client);
+                await _uow.SaveChangesAsync();
+            }
+
+            // 2) Get or create car
+            var carRepo = _uow.Repository<Car>();
+            var cars = await carRepo.FindAsync(c => c.ClientId == client.Id && c.PlateNumber == plate);
+            var car = cars.FirstOrDefault();
+
+            if (car == null)
+            {
+                car = new Car
+                {
+                    ClientId = client.Id,
+                    PlateNumber = plate,
+                    BodyType = request.Car.BodyType,
+                    Brand = request.Car.Brand?.Trim(),
+                    Model = request.Car.Model?.Trim(),
+                    Color = request.Car.Color?.Trim(),
+                    Year = request.Car.Year,
+                    IsDefault = request.Car.IsDefault
+                };
+                await carRepo.AddAsync(car);
+
+                if (request.Car.IsDefault)
+                {
+                    var otherCars = await carRepo.FindAsync(c => c.ClientId == client.Id);
+                    foreach (var oc in otherCars.Where(x => x.Id != car.Id && x.IsDefault))
+                    {
+                        oc.IsDefault = false;
+                        carRepo.Update(oc);
+                    }
+                }
+
+                await _uow.SaveChangesAsync();
+            }
+
+            // 3) Create booking
+            var create = new CreateBookingRequest
+            {
+                BranchId = request.BranchId,
+                ClientId = client.Id,
+                CarId = car.Id,
+                ScheduledStart = request.ScheduledStart,
+                ServiceIds = request.ServiceIds,
+                Notes = request.Notes
+            };
+
+            var bookingResponse = await CreateAsync(create);
+
+            // 4) assign مباشر لو موجود
+            if (request.AssignedEmployeeId.HasValue)
+            {
+                var bookingItemRepo = _uow.Repository<BookingItem>();
+                var employeeServiceRepo = _uow.Repository<EmployeeService>();
+
+                var employeeId = request.AssignedEmployeeId.Value;
+
+                var isWorking = await _scheduleService.IsEmployeeWorkingAsync(employeeId, request.ScheduledStart);
+                if (!isWorking)
+                    throw new BusinessException("Employee is not working at this time", 409);
+
+                var items = await bookingItemRepo.FindTrackingAsync(i => i.BookingId == bookingResponse.Id);
+
+                foreach (var item in items)
+                {
+                    var qualified = await employeeServiceRepo.AnyAsync(es =>
+                        es.EmployeeId == employeeId &&
+                        es.ServiceId == item.ServiceId &&
+                        es.IsActive);
+
+                    if (!qualified)
+                        throw new BusinessException(
+                            $"Employee {employeeId} is not qualified for service {item.ServiceId}",
+                            409
+                        );
+
+                    item.AssignedEmployeeId = employeeId;
+                    bookingItemRepo.Update(item);
+
+
+                    var respItem = bookingResponse.Items.FirstOrDefault(x => x.Id == item.Id);
+                    if (respItem != null)
+                        respItem.AssignedEmployeeId = employeeId;
+
+                }
+
+                await _uow.SaveChangesAsync();
+
+            }
+
+            // ✅ لازم ترجع في الآخر
+            return bookingResponse;
+        }
 
 
 
