@@ -403,6 +403,75 @@ namespace Forto.Infrastructure.Data
                 .HasForeignKey(x => x.MaterialId)
                 .OnDelete(DeleteBehavior.NoAction);
 
+
+
+
+
+
+
+            modelBuilder.Entity<Product>().ToTable("Products", "inventory");
+
+            modelBuilder.Entity<Product>()
+                .Property(x => x.SalePrice)
+                .HasPrecision(18, 3);
+
+            modelBuilder.Entity<Product>()
+                .Property(x => x.CostPerUnit)
+                .HasPrecision(18, 3);
+
+            // optional uniqueness
+            modelBuilder.Entity<Product>()
+                .HasIndex(x => x.Name)
+                .IsUnique();
+
+            modelBuilder.Entity<Product>()
+                .HasIndex(x => x.Sku)
+                .IsUnique(false); // سيبيه false لو sku مش دايمًا موجود
+
+
+
+
+
+
+
+
+
+
+            modelBuilder.Entity<BranchProductStock>()
+                .ToTable("BranchProductStocks", "ops");
+
+            modelBuilder.Entity<BranchProductStock>()
+                .Property(x => x.OnHandQty)
+                .HasPrecision(18, 3);
+
+            modelBuilder.Entity<BranchProductStock>()
+                .Property(x => x.ReservedQty)
+                .HasPrecision(18, 3);
+
+            modelBuilder.Entity<BranchProductStock>()
+                .Property(x => x.ReorderLevel)
+                .HasPrecision(18, 3);
+
+            // Unique per (Branch, Product)
+            modelBuilder.Entity<BranchProductStock>()
+                .HasIndex(x => new { x.BranchId, x.ProductId })
+                .IsUnique();
+
+            // Relationships (NoAction to avoid cascade paths)
+            modelBuilder.Entity<BranchProductStock>()
+                .HasOne(x => x.Branch)
+                .WithMany()
+                .HasForeignKey(x => x.BranchId)
+                .OnDelete(DeleteBehavior.NoAction);
+
+            modelBuilder.Entity<BranchProductStock>()
+                .HasOne(x => x.Product)
+                .WithMany()
+                .HasForeignKey(x => x.ProductId)
+                .OnDelete(DeleteBehavior.NoAction);
+
+
+
         }
 
         private static void SetSoftDeleteFilter<TEntity>(ModelBuilder builder) where TEntity : BaseEntity
