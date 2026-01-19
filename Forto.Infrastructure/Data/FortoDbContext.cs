@@ -472,6 +472,100 @@ namespace Forto.Infrastructure.Data
 
 
 
+
+
+
+
+
+            modelBuilder.Entity<ProductMovement>().ToTable("ProductMovements", "ops");
+
+            modelBuilder.Entity<ProductMovement>()
+                .Property(x => x.MovementType)
+                .HasConversion<int>();
+
+            modelBuilder.Entity<ProductMovement>()
+                .Property(x => x.Qty)
+                .HasPrecision(18, 3);
+
+            modelBuilder.Entity<ProductMovement>()
+                .Property(x => x.UnitCostSnapshot)
+                .HasPrecision(18, 3);
+
+            modelBuilder.Entity<ProductMovement>()
+                .Property(x => x.TotalCost)
+                .HasPrecision(18, 3);
+
+            modelBuilder.Entity<ProductMovement>()
+                .HasIndex(x => new { x.BranchId, x.OccurredAt });
+
+            modelBuilder.Entity<ProductMovement>()
+                .HasIndex(x => new { x.ProductId, x.OccurredAt });
+
+            modelBuilder.Entity<ProductMovement>()
+                .HasOne(x => x.Branch)
+                .WithMany()
+                .HasForeignKey(x => x.BranchId)
+                .OnDelete(DeleteBehavior.NoAction);
+
+            modelBuilder.Entity<ProductMovement>()
+                .HasOne(x => x.Product)
+                .WithMany()
+                .HasForeignKey(x => x.ProductId)
+                .OnDelete(DeleteBehavior.NoAction);
+
+
+
+
+
+            modelBuilder.Entity<ServiceGiftOption>().ToTable("ServiceGiftOptions", "catalog");
+
+            modelBuilder.Entity<ServiceGiftOption>()
+                .HasIndex(x => new { x.ServiceId, x.ProductId })
+                .IsUnique();
+
+            modelBuilder.Entity<ServiceGiftOption>()
+                .HasOne(x => x.Service)
+                .WithMany()
+                .HasForeignKey(x => x.ServiceId)
+                .OnDelete(DeleteBehavior.NoAction);
+
+            modelBuilder.Entity<ServiceGiftOption>()
+                .HasOne(x => x.Product)
+                .WithMany()
+                .HasForeignKey(x => x.ProductId)
+                .OnDelete(DeleteBehavior.NoAction);
+
+
+
+
+
+
+
+
+            modelBuilder.Entity<BookingGiftRedemption>()
+                .ToTable("BookingGiftRedemptions", "booking");
+
+            // ✅ هدية واحدة فقط لكل Booking
+            modelBuilder.Entity<BookingGiftRedemption>()
+                .HasIndex(x => x.BookingId)
+                .IsUnique();
+
+            modelBuilder.Entity<BookingGiftRedemption>()
+                .HasOne(x => x.Booking)
+                .WithMany()
+                .HasForeignKey(x => x.BookingId)
+                .OnDelete(DeleteBehavior.NoAction);
+
+            modelBuilder.Entity<BookingGiftRedemption>()
+                .HasOne(x => x.Product)
+                .WithMany()
+                .HasForeignKey(x => x.ProductId)
+                .OnDelete(DeleteBehavior.NoAction);
+
+
+
+
+
         }
 
         private static void SetSoftDeleteFilter<TEntity>(ModelBuilder builder) where TEntity : BaseEntity

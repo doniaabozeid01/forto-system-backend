@@ -8,10 +8,10 @@ namespace Forto.Api.Controllers
 
 
     [Route("api/branches/{branchId:int}/stock")]
-    public class BranchStockMovementsController : BaseApiController
+    public class MaterialStockMovementsController : BaseApiController
     {
         private readonly IStockMovementService _service;
-        public BranchStockMovementsController(IStockMovementService service) => _service = service;
+        public MaterialStockMovementsController(IStockMovementService service) => _service = service;
 
         [HttpPost("in")]
         public async Task<IActionResult> StockIn(int branchId, [FromBody] StockInRequest request)

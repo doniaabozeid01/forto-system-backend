@@ -18,6 +18,7 @@ using Forto.Application.Abstractions.Services.Inventory.MaterialsCheck;
 using Forto.Application.Abstractions.Services.Inventory.Products;
 using Forto.Application.Abstractions.Services.Invoices;
 using Forto.Application.Abstractions.Services.Ops.Products;
+using Forto.Application.Abstractions.Services.Ops.Products.StockMovement;
 using Forto.Application.Abstractions.Services.Ops.Stock;
 using Forto.Application.Abstractions.Services.Ops.Stock.StockMovement;
 using Forto.Application.Abstractions.Services.Ops.Usage;
@@ -81,6 +82,8 @@ namespace Forto.Api
                 options.UseSqlServer(builder.Configuration.GetConnectionString("DefaultConnection"));
             });
 
+
+
             builder.Services.AddScoped<IUnitOfWork, UnitOfWork>();
             builder.Services.AddScoped<IShiftService, ShiftService>();
             builder.Services.AddScoped<IEmployeeService, EmployeeService>();
@@ -105,6 +108,10 @@ namespace Forto.Api
             builder.Services.AddScoped<IStockMovementService, StockMovementService>();
             builder.Services.AddScoped<IProductService, ProductService>();
             builder.Services.AddScoped<IBranchProductStockService, BranchProductStockService>();
+            builder.Services.AddScoped<IProductStockMovementService, ProductStockMovementService>();
+
+
+
 
 
             // Learn more about configuring Swagger/OpenAPI at https://aka.ms/aspnetcore/swashbuckle

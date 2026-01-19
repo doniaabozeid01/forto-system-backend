@@ -1,5 +1,7 @@
 ﻿using Forto.Application.Abstractions.Services.Invoices;
 using Forto.Application.DTOs.Billings;
+using Forto.Application.DTOs.Billings.cashier;
+using Forto.Application.DTOs.Billings.Gifts;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
 
@@ -12,6 +14,7 @@ namespace Forto.Api.Controllers
 
         public InvoicesController(IInvoiceService service) => _service = service;
 
+
         [HttpGet("by-booking/{bookingId:int}")]
         public async Task<IActionResult> GetByBooking(int bookingId)
         {
@@ -20,12 +23,57 @@ namespace Forto.Api.Controllers
             return OkResponse(data, "OK");
         }
 
+
+
+
         [HttpPost("{invoiceId:int}/pay-cash")]
         public async Task<IActionResult> PayCash(int invoiceId, [FromBody] PayCashRequest request)
         {
             var data = await _service.PayCashAsync(invoiceId, request.CashierId);
             return OkResponse(data, "Paid");
         }
+
+
+
+
+
+        [HttpPost("{invoiceId:int}/products")]
+        public async Task<IActionResult> SellProduct(int invoiceId, [FromBody] SellProductOnInvoiceRequest request)
+        {
+            var data = await _service.SellProductAsync(invoiceId, request);
+            return OkResponse(data, "Product added to invoice");
+        }
+
+
+
+
+
+
+
+
+
+
+        [HttpGet("{invoiceId:int}/gift-options")]
+        public async Task<IActionResult> GetGiftOptions(int invoiceId)
+        {
+            var data = await _service.GetGiftOptionsAsync(invoiceId);
+            return OkResponse(data, "OK");
+        }
+
+
+
+
+
+
+        [HttpPost("{invoiceId:int}/gift/select")]
+        public async Task<IActionResult> SelectGift(int invoiceId, [FromBody] SelectInvoiceGiftRequest request)
+        {
+            var data = await _service.SelectGiftAsync(invoiceId, request);
+            return OkResponse(data, "Gift selected");
+        }
+
+
+
     }
 
 }

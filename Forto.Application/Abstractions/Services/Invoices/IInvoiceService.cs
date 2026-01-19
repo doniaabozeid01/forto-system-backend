@@ -1,4 +1,6 @@
 ﻿using Forto.Application.DTOs.Billings;
+using Forto.Application.DTOs.Billings.cashier;
+using Forto.Application.DTOs.Billings.Gifts;
 using System;
 using System.Collections.Generic;
 using System.Linq;
@@ -14,5 +16,11 @@ namespace Forto.Application.Abstractions.Services.Invoices
         Task<InvoiceResponse> PayCashAsync(int invoiceId, int cashierId);
 
         Task RecalculateForBookingAsync(int bookingId, bool save = true); // لو اتلغت خدمات قبل الدفع
+
+        Task<InvoiceResponse> SellProductAsync(int invoiceId, SellProductOnInvoiceRequest request);
+
+        Task<InvoiceGiftOptionsResponse> GetGiftOptionsAsync(int invoiceId);
+        Task<InvoiceResponse> SelectGiftAsync(int invoiceId, SelectInvoiceGiftRequest request);
+
     }
 }

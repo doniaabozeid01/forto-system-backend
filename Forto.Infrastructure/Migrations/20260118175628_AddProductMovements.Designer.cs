@@ -4,6 +4,7 @@ using Forto.Infrastructure.Data;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Infrastructure;
 using Microsoft.EntityFrameworkCore.Metadata;
+using Microsoft.EntityFrameworkCore.Migrations;
 using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 
 #nullable disable
@@ -11,9 +12,11 @@ using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 namespace Forto.Infrastructure.Migrations
 {
     [DbContext(typeof(FortoDbContext))]
-    partial class FortoDbContextModelSnapshot : ModelSnapshot
+    [Migration("20260118175628_AddProductMovements")]
+    partial class AddProductMovements
     {
-        protected override void BuildModel(ModelBuilder modelBuilder)
+        /// <inheritdoc />
+        protected override void BuildTargetModel(ModelBuilder modelBuilder)
         {
 #pragma warning disable 612, 618
             modelBuilder
@@ -169,54 +172,6 @@ namespace Forto.Infrastructure.Migrations
                     b.ToTable("Bookings", "booking");
                 });
 
-            modelBuilder.Entity("Forto.Domain.Entities.Bookings.BookingGiftRedemption", b =>
-                {
-                    b.Property<int>("Id")
-                        .ValueGeneratedOnAdd()
-                        .HasColumnType("int");
-
-                    SqlServerPropertyBuilderExtensions.UseIdentityColumn(b.Property<int>("Id"));
-
-                    b.Property<int>("BookingId")
-                        .HasColumnType("int");
-
-                    b.Property<DateTime>("CreatedAt")
-                        .HasColumnType("datetime2");
-
-                    b.Property<int>("InvoiceId")
-                        .HasColumnType("int");
-
-                    b.Property<int>("InvoiceLineId")
-                        .HasColumnType("int");
-
-                    b.Property<bool>("IsDeleted")
-                        .HasColumnType("bit");
-
-                    b.Property<string>("Notes")
-                        .HasColumnType("nvarchar(max)");
-
-                    b.Property<DateTime>("OccurredAt")
-                        .HasColumnType("datetime2");
-
-                    b.Property<int>("ProductId")
-                        .HasColumnType("int");
-
-                    b.Property<int>("SelectedByCashierId")
-                        .HasColumnType("int");
-
-                    b.Property<DateTime?>("UpdatedAt")
-                        .HasColumnType("datetime2");
-
-                    b.HasKey("Id");
-
-                    b.HasIndex("BookingId")
-                        .IsUnique();
-
-                    b.HasIndex("ProductId");
-
-                    b.ToTable("BookingGiftRedemptions", "booking");
-                });
-
             modelBuilder.Entity("Forto.Domain.Entities.Bookings.BookingItem", b =>
                 {
                     b.Property<int>("Id")
@@ -350,42 +305,6 @@ namespace Forto.Infrastructure.Migrations
                     b.HasIndex("CategoryId", "Name");
 
                     b.ToTable("Services", "catalog");
-                });
-
-            modelBuilder.Entity("Forto.Domain.Entities.Catalog.ServiceGiftOption", b =>
-                {
-                    b.Property<int>("Id")
-                        .ValueGeneratedOnAdd()
-                        .HasColumnType("int");
-
-                    SqlServerPropertyBuilderExtensions.UseIdentityColumn(b.Property<int>("Id"));
-
-                    b.Property<DateTime>("CreatedAt")
-                        .HasColumnType("datetime2");
-
-                    b.Property<bool>("IsActive")
-                        .HasColumnType("bit");
-
-                    b.Property<bool>("IsDeleted")
-                        .HasColumnType("bit");
-
-                    b.Property<int>("ProductId")
-                        .HasColumnType("int");
-
-                    b.Property<int>("ServiceId")
-                        .HasColumnType("int");
-
-                    b.Property<DateTime?>("UpdatedAt")
-                        .HasColumnType("datetime2");
-
-                    b.HasKey("Id");
-
-                    b.HasIndex("ProductId");
-
-                    b.HasIndex("ServiceId", "ProductId")
-                        .IsUnique();
-
-                    b.ToTable("ServiceGiftOptions", "catalog");
                 });
 
             modelBuilder.Entity("Forto.Domain.Entities.Catalog.ServiceMaterialRecipe", b =>
@@ -1171,25 +1090,6 @@ namespace Forto.Infrastructure.Migrations
                     b.Navigation("Client");
                 });
 
-            modelBuilder.Entity("Forto.Domain.Entities.Bookings.BookingGiftRedemption", b =>
-                {
-                    b.HasOne("Forto.Domain.Entities.Bookings.Booking", "Booking")
-                        .WithMany()
-                        .HasForeignKey("BookingId")
-                        .OnDelete(DeleteBehavior.NoAction)
-                        .IsRequired();
-
-                    b.HasOne("Forto.Domain.Entities.Inventory.Product", "Product")
-                        .WithMany()
-                        .HasForeignKey("ProductId")
-                        .OnDelete(DeleteBehavior.NoAction)
-                        .IsRequired();
-
-                    b.Navigation("Booking");
-
-                    b.Navigation("Product");
-                });
-
             modelBuilder.Entity("Forto.Domain.Entities.Bookings.BookingItem", b =>
                 {
                     b.HasOne("Forto.Domain.Entities.Employees.Employee", "AssignedEmployee")
@@ -1233,25 +1133,6 @@ namespace Forto.Infrastructure.Migrations
                         .IsRequired();
 
                     b.Navigation("Category");
-                });
-
-            modelBuilder.Entity("Forto.Domain.Entities.Catalog.ServiceGiftOption", b =>
-                {
-                    b.HasOne("Forto.Domain.Entities.Inventory.Product", "Product")
-                        .WithMany()
-                        .HasForeignKey("ProductId")
-                        .OnDelete(DeleteBehavior.NoAction)
-                        .IsRequired();
-
-                    b.HasOne("Forto.Domain.Entities.Catalog.Service", "Service")
-                        .WithMany()
-                        .HasForeignKey("ServiceId")
-                        .OnDelete(DeleteBehavior.NoAction)
-                        .IsRequired();
-
-                    b.Navigation("Product");
-
-                    b.Navigation("Service");
                 });
 
             modelBuilder.Entity("Forto.Domain.Entities.Catalog.ServiceMaterialRecipe", b =>

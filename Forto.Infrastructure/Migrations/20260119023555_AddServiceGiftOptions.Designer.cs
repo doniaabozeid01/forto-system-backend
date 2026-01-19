@@ -4,6 +4,7 @@ using Forto.Infrastructure.Data;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Infrastructure;
 using Microsoft.EntityFrameworkCore.Metadata;
+using Microsoft.EntityFrameworkCore.Migrations;
 using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 
 #nullable disable
@@ -11,9 +12,11 @@ using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 namespace Forto.Infrastructure.Migrations
 {
     [DbContext(typeof(FortoDbContext))]
-    partial class FortoDbContextModelSnapshot : ModelSnapshot
+    [Migration("20260119023555_AddServiceGiftOptions")]
+    partial class AddServiceGiftOptions
     {
-        protected override void BuildModel(ModelBuilder modelBuilder)
+        /// <inheritdoc />
+        protected override void BuildTargetModel(ModelBuilder modelBuilder)
         {
 #pragma warning disable 612, 618
             modelBuilder
@@ -167,54 +170,6 @@ namespace Forto.Infrastructure.Migrations
                     b.HasIndex("BranchId", "SlotHourStart");
 
                     b.ToTable("Bookings", "booking");
-                });
-
-            modelBuilder.Entity("Forto.Domain.Entities.Bookings.BookingGiftRedemption", b =>
-                {
-                    b.Property<int>("Id")
-                        .ValueGeneratedOnAdd()
-                        .HasColumnType("int");
-
-                    SqlServerPropertyBuilderExtensions.UseIdentityColumn(b.Property<int>("Id"));
-
-                    b.Property<int>("BookingId")
-                        .HasColumnType("int");
-
-                    b.Property<DateTime>("CreatedAt")
-                        .HasColumnType("datetime2");
-
-                    b.Property<int>("InvoiceId")
-                        .HasColumnType("int");
-
-                    b.Property<int>("InvoiceLineId")
-                        .HasColumnType("int");
-
-                    b.Property<bool>("IsDeleted")
-                        .HasColumnType("bit");
-
-                    b.Property<string>("Notes")
-                        .HasColumnType("nvarchar(max)");
-
-                    b.Property<DateTime>("OccurredAt")
-                        .HasColumnType("datetime2");
-
-                    b.Property<int>("ProductId")
-                        .HasColumnType("int");
-
-                    b.Property<int>("SelectedByCashierId")
-                        .HasColumnType("int");
-
-                    b.Property<DateTime?>("UpdatedAt")
-                        .HasColumnType("datetime2");
-
-                    b.HasKey("Id");
-
-                    b.HasIndex("BookingId")
-                        .IsUnique();
-
-                    b.HasIndex("ProductId");
-
-                    b.ToTable("BookingGiftRedemptions", "booking");
                 });
 
             modelBuilder.Entity("Forto.Domain.Entities.Bookings.BookingItem", b =>
@@ -1169,25 +1124,6 @@ namespace Forto.Infrastructure.Migrations
                     b.Navigation("Car");
 
                     b.Navigation("Client");
-                });
-
-            modelBuilder.Entity("Forto.Domain.Entities.Bookings.BookingGiftRedemption", b =>
-                {
-                    b.HasOne("Forto.Domain.Entities.Bookings.Booking", "Booking")
-                        .WithMany()
-                        .HasForeignKey("BookingId")
-                        .OnDelete(DeleteBehavior.NoAction)
-                        .IsRequired();
-
-                    b.HasOne("Forto.Domain.Entities.Inventory.Product", "Product")
-                        .WithMany()
-                        .HasForeignKey("ProductId")
-                        .OnDelete(DeleteBehavior.NoAction)
-                        .IsRequired();
-
-                    b.Navigation("Booking");
-
-                    b.Navigation("Product");
                 });
 
             modelBuilder.Entity("Forto.Domain.Entities.Bookings.BookingItem", b =>

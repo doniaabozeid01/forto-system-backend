@@ -6,12 +6,12 @@ using Microsoft.AspNetCore.Mvc;
 namespace Forto.Api.Controllers
 {
     [Route("api/branches/{branchId:int}/stock")]
-    public class BranchStockController : BaseApiController
+    public class BranchMaterialStockController : BaseApiController
     {
 
         private readonly IBranchStockService _service;
 
-        public BranchStockController(IBranchStockService service) => _service = service;
+        public BranchMaterialStockController(IBranchStockService service) => _service = service;
 
 
 
