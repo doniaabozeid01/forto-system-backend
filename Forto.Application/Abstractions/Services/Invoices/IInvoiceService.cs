@@ -22,5 +22,12 @@ namespace Forto.Application.Abstractions.Services.Invoices
         Task<InvoiceGiftOptionsResponse> GetGiftOptionsAsync(int invoiceId);
         Task<InvoiceResponse> SelectGiftAsync(int invoiceId, SelectInvoiceGiftRequest request);
 
+
+
+
+
+        Task<InvoiceResponse> CreatePosInvoicePaidCashAsync(CreatePosInvoiceRequest request);
+
+
     }
 }

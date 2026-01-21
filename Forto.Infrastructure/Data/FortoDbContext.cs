@@ -566,6 +566,22 @@ namespace Forto.Infrastructure.Data
 
 
 
+
+            modelBuilder.Entity<Invoice>()
+    .HasOne(x => x.Branch)
+    .WithMany()
+    .HasForeignKey(x => x.BranchId)
+    .OnDelete(DeleteBehavior.NoAction);
+
+            // Booking relation (nullable)
+            modelBuilder.Entity<Invoice>()
+                .HasOne(x => x.Booking)
+                .WithMany()
+                .HasForeignKey(x => x.BookingId)
+                .OnDelete(DeleteBehavior.NoAction);
+
+
+
         }
 
         private static void SetSoftDeleteFilter<TEntity>(ModelBuilder builder) where TEntity : BaseEntity

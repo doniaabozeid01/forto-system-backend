@@ -807,48 +807,55 @@ namespace Forto.Application.Abstractions.Services.Bookings
             var bookingResponse = await CreateAsync(create);
 
             // 4) assign مباشر لو موجود
-            if (request.AssignedEmployeeId.HasValue)
+            // ✅ assign per service (optional)
+            if (request.ServiceAssignments != null && request.ServiceAssignments.Count > 0)
             {
                 var bookingItemRepo = _uow.Repository<BookingItem>();
                 var employeeServiceRepo = _uow.Repository<EmployeeService>();
 
-                var employeeId = request.AssignedEmployeeId.Value;
+                // serviceId -> employeeId
+                var map = request.ServiceAssignments
+                    .GroupBy(x => x.ServiceId)
+                    .ToDictionary(g => g.Key, g => g.First().EmployeeId);
 
-                var isWorking = await _scheduleService.IsEmployeeWorkingAsync(employeeId, request.ScheduledStart);
-                if (!isWorking)
-                    throw new BusinessException("Employee is not working at this time", 409);
-
+                // هات كل booking items tracking
                 var items = await bookingItemRepo.FindTrackingAsync(i => i.BookingId == bookingResponse.Id);
 
                 foreach (var item in items)
                 {
+                    // لو مش معمول assignment للخدمة دي، سيبيها null
+                    if (!map.TryGetValue(item.ServiceId, out var employeeId))
+                        continue;
+
+                    // ✅ شغال في الوقت ده؟
+                    var isWorking = await _scheduleService.IsEmployeeWorkingAsync(employeeId, request.ScheduledStart);
+                    if (!isWorking)
+                        throw new BusinessException($"Employee {employeeId} is not working at this time", 409);
+
+                    // ✅ مؤهل للخدمة؟
                     var qualified = await employeeServiceRepo.AnyAsync(es =>
                         es.EmployeeId == employeeId &&
                         es.ServiceId == item.ServiceId &&
                         es.IsActive);
 
                     if (!qualified)
-                        throw new BusinessException(
-                            $"Employee {employeeId} is not qualified for service {item.ServiceId}",
-                            409
-                        );
+                        throw new BusinessException($"Employee {employeeId} is not qualified for service {item.ServiceId}", 409);
 
+                    // assign
                     item.AssignedEmployeeId = employeeId;
                     bookingItemRepo.Update(item);
 
-
+                    // ✅ عدّل response كمان (عشان يرجع فورًا)
                     var respItem = bookingResponse.Items.FirstOrDefault(x => x.Id == item.Id);
                     if (respItem != null)
                         respItem.AssignedEmployeeId = employeeId;
-
                 }
 
                 await _uow.SaveChangesAsync();
-
             }
 
-            // ✅ لازم ترجع في الآخر
             return bookingResponse;
+
         }
 
 

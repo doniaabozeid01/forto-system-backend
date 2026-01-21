@@ -1,4 +1,5 @@
 ﻿using Forto.Domain.Entities.Bookings;
+using Forto.Domain.Entities.Ops;
 using Forto.Domain.Enum;
 using System;
 using System.Collections.Generic;
@@ -10,8 +11,11 @@ namespace Forto.Domain.Entities.Billings
 {
     public class Invoice : BaseEntity
     {
-        public int BookingId { get; set; }
-        public Booking Booking { get; set; } = null!;
+        public int? BookingId { get; set; }
+        public Booking? Booking { get; set; } = null!;
+
+        public int? BranchId { get; set; }            // ✅ required
+        public Branch? Branch { get; set; } = null!;
 
         public decimal SubTotal { get; set; }
         public decimal Discount { get; set; } = 0;

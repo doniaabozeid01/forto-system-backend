@@ -20,9 +20,6 @@ namespace Forto.Application.Abstractions.Services.Bookings
 
         Task<BookingResponse> QuickCreateAsync(QuickCreateBookingRequest request);
 
-
-
-
         // Admin
         //Task CancelBookingItemAsync(int itemId, CashierActionRequest request);
         //Task CancelBookingAsync(int bookingId, CashierActionRequest request);

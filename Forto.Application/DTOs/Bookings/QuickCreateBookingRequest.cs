@@ -24,7 +24,10 @@ namespace Forto.Application.DTOs.Bookings
         [Required]
         public CarInput Car { get; set; } = new();
 
-        public int? AssignedEmployeeId { get; set; }
+        //public int? AssignedEmployeeId { get; set; }
+
+        public List<ServiceAssignmentDto>? ServiceAssignments { get; set; }
+
 
         public string? Notes { get; set; }
     }

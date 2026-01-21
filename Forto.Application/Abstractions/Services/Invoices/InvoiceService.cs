@@ -140,6 +140,7 @@ namespace Forto.Application.Abstractions.Services.Invoices
             var invoice = new Invoice
             {
                 BookingId = bookingId,
+                BranchId= booking.BranchId,
                 SubTotal = subTotal,
                 Discount = 0,
                 Total = subTotal,
@@ -482,7 +483,7 @@ namespace Forto.Application.Abstractions.Services.Invoices
                 throw new BusinessException("Invoice must be Unpaid to add products", 409);
 
             // 3) booking to know branch
-            var booking = await bookingRepo.GetByIdAsync(invoice.BookingId);
+            var booking = await bookingRepo.GetByIdAsync(invoice.BookingId ?? 0);
             if (booking == null)
                 throw new BusinessException("Booking not found", 404);
 
@@ -569,7 +570,7 @@ namespace Forto.Application.Abstractions.Services.Invoices
         private static InvoiceResponse Map(Invoice inv) => new()
         {
             Id = inv.Id,
-            BookingId = inv.BookingId,
+            BookingId = inv.BookingId ?? 0,
             SubTotal = inv.SubTotal,
             Discount = inv.Discount,
             Total = inv.Total,
@@ -609,7 +610,7 @@ namespace Forto.Application.Abstractions.Services.Invoices
             var invoice = await invRepo.GetByIdAsync(invoiceId);
             if (invoice == null) throw new BusinessException("Invoice not found", 404);
 
-            var booking = await bookingRepo.GetByIdAsync(invoice.BookingId);
+            var booking = await bookingRepo.GetByIdAsync(invoice.BookingId ??0);
             if (booking == null) throw new BusinessException("Booking not found", 404);
 
             var branchId = booking.BranchId;
@@ -733,7 +734,7 @@ namespace Forto.Application.Abstractions.Services.Invoices
             if (invoice.Status != InvoiceStatus.Unpaid)
                 throw new BusinessException("Invoice must be Unpaid to select gift", 409);
 
-            var booking = await bookingRepo.GetByIdAsync(invoice.BookingId);
+            var booking = await bookingRepo.GetByIdAsync(invoice.BookingId ?? 0);
             if (booking == null) throw new BusinessException("Booking not found", 404);
 
             // ✅ واحدة فقط لكل booking
@@ -827,6 +828,136 @@ namespace Forto.Application.Abstractions.Services.Invoices
             await _uow.SaveChangesAsync();
 
             // reload invoice lines
+            var lines = await lineRepo.FindAsync(l => l.InvoiceId == invoice.Id);
+            invoice.Lines = lines.ToList();
+
+            return Map(invoice);
+        }
+
+
+
+
+
+
+
+
+
+        public async Task<InvoiceResponse> CreatePosInvoicePaidCashAsync(CreatePosInvoiceRequest request)
+        {
+            // cashier role check (زي PayCash)
+            var empRepo = _uow.Repository<Employee>();
+            var cashier = await empRepo.GetByIdAsync(request.CashierId);
+            if (cashier == null || !cashier.IsActive)
+                throw new BusinessException("Cashier not found", 404);
+
+            if (!(cashier.Role == EmployeeRole.Cashier || cashier.Role == EmployeeRole.Supervisor || cashier.Role == EmployeeRole.Admin))
+                throw new BusinessException("Not allowed", 403);
+
+            var branch = await _uow.Repository<Branch>().GetByIdAsync(request.BranchId);
+            if (branch == null || !branch.IsActive)
+                throw new BusinessException("Branch not found", 404);
+
+            if (request.Items == null || request.Items.Count == 0)
+                throw new BusinessException("Items is required", 400);
+
+            var occurred = request.OccurredAt ?? DateTime.UtcNow;
+
+            var productRepo = _uow.Repository<Product>();
+            var stockRepo = _uow.Repository<BranchProductStock>();
+            var moveRepo = _uow.Repository<ProductMovement>();
+            var invRepo = _uow.Repository<Invoice>();
+            var lineRepo = _uow.Repository<InvoiceLine>();
+
+            var productIds = request.Items.Select(x => x.ProductId).Distinct().ToList();
+            var products = await productRepo.FindAsync(p => productIds.Contains(p.Id) && p.IsActive);
+            var pMap = products.ToDictionary(p => p.Id, p => p);
+
+            var missing = productIds.Where(id => !pMap.ContainsKey(id)).ToList();
+            if (missing.Any())
+                throw new BusinessException("Some products not found", 404,
+                    new Dictionary<string, string[]> { ["productId"] = missing.Select(x => x.ToString()).ToArray() });
+
+            var stocks = await stockRepo.FindTrackingAsync(s => s.BranchId == request.BranchId && productIds.Contains(s.ProductId));
+            var sMap = stocks.ToDictionary(s => s.ProductId, s => s);
+
+            // stock check
+            foreach (var it in request.Items)
+            {
+                if (!sMap.TryGetValue(it.ProductId, out var st))
+                    throw new BusinessException("Product stock not found in this branch", 409);
+
+                var available = st.OnHandQty - st.ReservedQty;
+                if (available < 0) available = 0;
+
+                if (available < it.Qty)
+                    throw new BusinessException($"Not enough stock for product {it.ProductId}", 409);
+            }
+
+            // create invoice header (POS = BookingId null)
+            var invoice = new Invoice
+            {
+                BookingId = null,
+                BranchId = request.BranchId,
+                SubTotal = 0,
+                Discount = 0,
+                Total = 0,
+                Status = InvoiceStatus.Paid,
+                PaymentMethod = PaymentMethod.Cash,
+                PaidByEmployeeId = request.CashierId,
+                PaidAt = occurred
+            };
+
+            await invRepo.AddAsync(invoice);
+            await _uow.SaveChangesAsync(); // get invoice.Id
+
+            decimal subTotal = 0;
+
+            foreach (var it in request.Items)
+            {
+                var p = pMap[it.ProductId];
+                var st = sMap[it.ProductId];
+
+                // decrease stock
+                st.OnHandQty -= it.Qty;
+                stockRepo.Update(st);
+
+                // invoice line
+                var lineTotal = it.Qty * p.SalePrice;
+                subTotal += lineTotal;
+
+                await lineRepo.AddAsync(new InvoiceLine
+                {
+                    InvoiceId = invoice.Id,
+                    Description = $"Product: {p.Name}",
+                    Qty = 1,                 // لو عايزة Qty decimal في InvoiceLine لازم نغيره، فمؤقتًا نخليها 1
+                    UnitPrice = p.SalePrice,
+                    Total = lineTotal
+                });
+
+                // movement SELL
+                await moveRepo.AddAsync(new ProductMovement
+                {
+                    BranchId = request.BranchId,
+                    ProductId = p.Id,
+                    MovementType = ProductMovementType.Sell,
+                    Qty = it.Qty,
+                    UnitCostSnapshot = p.CostPerUnit,
+                    TotalCost = it.Qty * p.CostPerUnit,
+                    OccurredAt = occurred,
+                    InvoiceId = invoice.Id,
+                    BookingId = null,
+                    BookingItemId = null,
+                    RecordedByEmployeeId = request.CashierId,
+                    Notes = request.Notes ?? "POS invoice"
+                });
+            }
+
+            invoice.SubTotal = subTotal;
+            invoice.Total = subTotal - invoice.Discount;
+            invRepo.Update(invoice);
+
+            await _uow.SaveChangesAsync();
+
             var lines = await lineRepo.FindAsync(l => l.InvoiceId == invoice.Id);
             invoice.Lines = lines.ToList();
 

@@ -74,6 +74,20 @@ namespace Forto.Api.Controllers
 
 
 
+
+
+
+
+
+
+        [HttpPost("pos")]
+        public async Task<IActionResult> CreatePosInvoice([FromBody] CreatePosInvoiceRequest request)
+        {
+            var data = await _service.CreatePosInvoicePaidCashAsync(request);
+            return CreatedResponse(data, "POS invoice created");
+        }
+
+
     }
 
 }
