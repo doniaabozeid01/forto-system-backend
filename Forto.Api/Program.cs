@@ -1,6 +1,8 @@
 
+using System.Text;
 using Forto.Api.Common;
 using Forto.Api.Middleware;
+using Forto.Api.Seed;
 using Forto.Application.Abstractions.Repositories;
 using Forto.Application.Abstractions.Services.Bookings;
 using Forto.Application.Abstractions.Services.Bookings.Admin;
@@ -10,6 +12,7 @@ using Forto.Application.Abstractions.Services.Catalogs.Categories;
 using Forto.Application.Abstractions.Services.Catalogs.Recipes;
 using Forto.Application.Abstractions.Services.Catalogs.Service;
 using Forto.Application.Abstractions.Services.Clients;
+using Forto.Application.Abstractions.Services.Dashboard;
 using Forto.Application.Abstractions.Services.Employees;
 using Forto.Application.Abstractions.Services.Employees.Tasks;
 using Forto.Application.Abstractions.Services.EmployeeServices;
@@ -24,17 +27,21 @@ using Forto.Application.Abstractions.Services.Ops.Stock.StockMovement;
 using Forto.Application.Abstractions.Services.Ops.Usage;
 using Forto.Application.Abstractions.Services.Schedule;
 using Forto.Application.Abstractions.Services.Shift;
+using Forto.Domain.Entities.Identity;
 using Forto.Infrastructure.Data;
 using Forto.Infrastructure.UnitOfWork;
+using Microsoft.AspNetCore.Authentication.JwtBearer;
+using Microsoft.AspNetCore.Identity;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Migrations;
+using Microsoft.IdentityModel.Tokens;
 
 namespace Forto.Api
 {
     public class Program
     {
-        public static void Main(string[] args)
+        public static async Task Main(string[] args)
         {
             var builder = WebApplication.CreateBuilder(args);
 
@@ -83,6 +90,42 @@ namespace Forto.Api
             });
 
 
+            builder.Services
+                .AddIdentityCore<ApplicationUser>(options =>
+                {
+                    options.User.RequireUniqueEmail = false;
+
+                    options.Password.RequiredLength = 6;
+                    options.Password.RequireDigit = false;
+                    options.Password.RequireLowercase = false;
+                    options.Password.RequireUppercase = false;
+                    options.Password.RequireNonAlphanumeric = false;
+                })
+                .AddRoles<ApplicationRole>()
+                .AddEntityFrameworkStores<FortoDbContext>()
+                .AddSignInManager()
+                .AddDefaultTokenProviders();
+
+            var jwt = builder.Configuration.GetSection("Jwt");
+            var key = new SymmetricSecurityKey(Encoding.UTF8.GetBytes(jwt["Key"]!));
+
+            builder.Services.AddAuthentication(JwtBearerDefaults.AuthenticationScheme)
+                .AddJwtBearer(options =>
+                {
+                    options.TokenValidationParameters = new TokenValidationParameters
+                    {
+                        ValidateIssuer = true,
+                        ValidIssuer = jwt["Issuer"],
+                        ValidateAudience = true,
+                        ValidAudience = jwt["Audience"],
+                        ValidateIssuerSigningKey = true,
+                        IssuerSigningKey = key,
+                        ValidateLifetime = true,
+                        ClockSkew = TimeSpan.FromMinutes(2)
+                    };
+                });
+
+            builder.Services.AddAuthorization();
 
             builder.Services.AddScoped<IUnitOfWork, UnitOfWork>();
             builder.Services.AddScoped<IShiftService, ShiftService>();
@@ -109,6 +152,7 @@ namespace Forto.Api
             builder.Services.AddScoped<IProductService, ProductService>();
             builder.Services.AddScoped<IBranchProductStockService, BranchProductStockService>();
             builder.Services.AddScoped<IProductStockMovementService, ProductStockMovementService>();
+            builder.Services.AddScoped<IDashboardService, DashboardService>();
 
 
 
@@ -118,8 +162,32 @@ namespace Forto.Api
             builder.Services.AddEndpointsApiExplorer();
             builder.Services.AddSwaggerGen();
 
+
+
             // Middleware registration
             builder.Services.AddTransient<ExceptionHandlingMiddleware>();
+
+
+            // ? CORS Policy
+            builder.Services.AddCors(options =>
+            {
+                options.AddPolicy("AllowBubbleOrigins", policy =>
+                    policy.WithOrigins(
+                            "http://localhost:4200"
+                        )
+                        .AllowAnyHeader()
+                        .AllowAnyMethod()
+                        .AllowCredentials());
+
+                options.AddPolicy("ContactFormOnly", p => p
+                    .WithOrigins("https://doniaabozeid01.github.io") // **??????? ???** ???? ??????
+                    .WithHeaders("Content-Type")
+                    .WithMethods("POST"));
+
+            });
+
+
+
 
             var app = builder.Build();
 
@@ -132,11 +200,14 @@ namespace Forto.Api
 
             app.UseHttpsRedirection();
 
+            app.UseAuthentication();
             app.UseAuthorization();
 
 
             app.UseMiddleware<ExceptionHandlingMiddleware>();
+            app.UseCors("AllowBubbleOrigins");
 
+            await IdentitySeeder.SeedRolesAsync(app.Services);
 
             app.MapControllers();
 
@@ -146,80 +217,3 @@ namespace Forto.Api
 }
 
 
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-//using Forto.Api.Common;
-//using Forto.Api.Middleware;
-//using Forto.Application.Abstractions.Repositories;
-//using Forto.Infrastructure.Data;
-//using Forto.Infrastructure.UnitOfWork;
-//using Microsoft.AspNetCore.Mvc;
-
-//var builder = WebApplication.CreateBuilder(args);
-
-//// Logging (????????? ???? ??????)
-//// builder.Logging.ClearProviders(); // ???????
-//// builder.Logging.AddConsole();     // ???? ?????? ????????
-
-
-//builder.Services.AddDbContext<FortoDbContext>(options =>
-//{
-//    options.UseSqlServer(builder.Configuration.GetConnectionString("DefaultConnection"));
-//});
-
-//builder.Services.AddScoped<IUnitOfWork, UnitOfWork>();
-
-
-//builder.Services.AddControllers()
-//    .ConfigureApiBehaviorOptions(options =>
-//    {
-//        options.InvalidModelStateResponseFactory = context =>
-//        {
-//            var errors = context.ModelState
-//                .Where(x => x.Value?.Errors.Count > 0)
-//                .ToDictionary(
-//                    k => k.Key,
-//                    v => v.Value!.Errors.Select(e => e.ErrorMessage).ToArray()
-//                );
-
-//            var traceId = context.HttpContext.TraceIdentifier;
-
-//            var response = ApiResponse<object>.Fail(
-//                message: "Validation failed",
-//                errors: errors,
-//                traceId: traceId
-//            );
-
-//            return new BadRequestObjectResult(response);
-//        };
-//    });
-
-//builder.Services.AddEndpointsApiExplorer();
-//builder.Services.AddSwaggerGen();
-
-//// Middleware registration
-//builder.Services.AddTransient<ExceptionHandlingMiddleware>();
-
-//var app = builder.Build();
-
-//app.UseSwagger();
-//app.UseSwaggerUI();
-
-//app.UseMiddleware<ExceptionHandlingMiddleware>();
-
-//app.MapControllers();
-//app.Run();

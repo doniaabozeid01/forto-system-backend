@@ -35,37 +35,178 @@ namespace Forto.Application.Abstractions.Services.Bookings
             _uow = uow;
         }
 
-        public async Task<AvailableSlotsResponse> GetAvailableSlotsAsync(int branchId, DateOnly date, int carId, List<int> serviceIds)
+
+        //public async Task<AvailableSlotsResponse> GetAvailableSlotsAsync(int branchId, DateOnly date, int carId, List<int> serviceIds)
+        //{
+        //    // Validate branch
+        //    var branch = await _uow.Repository<Branch>().GetByIdAsync(branchId);
+        //    if (branch == null || !branch.IsActive)
+        //        throw new BusinessException("Branch not found", 404);
+
+        //    // Validate car exists
+        //    var car = await _uow.Repository<Car>().GetByIdAsync(carId);
+        //    if (car == null)
+        //        throw new BusinessException("Car not found", 404);
+
+        //    // Validate services + rates exist for body type
+        //    var svcIds = serviceIds.Distinct().ToList();
+        //    if (svcIds.Count == 0)
+        //        throw new BusinessException("ServiceIds is required", 400);
+
+        //    await EnsureRatesExistForBodyType(svcIds, car.BodyType);
+
+        //    // Staff check (MVP): for each service, at least ONE qualified employee working that hour
+        //    // We'll evaluate for each hour slot.
+
+        //    // Build list of hours (example 9 AM -> 9 PM). You can adjust later.
+        //    //var hours = Enumerable.Range(9, 12).Select(h => new TimeOnly(h, 0)).ToList(); // 09:00 -> 20:00
+        //    // build hours dynamically from schedules+shifts for that date
+        //    var dow = date.DayOfWeek;
+
+        //    var scheduleRepo = _uow.Repository<EmployeeWorkSchedule>();
+        //    var shiftRepo = _uow.Repository<Domain.Entities.Employees.Shift>();
+
+        //    var schedules = await scheduleRepo.FindAsync(s => s.DayOfWeek == dow && !s.IsOff);
+
+        //    if (schedules.Count == 0)
+        //    {
+        //        return new AvailableSlotsResponse
+        //        {
+        //            Date = date,
+        //            CapacityPerHour = branch.CapacityPerHour,
+        //            Slots = new List<HourSlotDto>()
+        //        };
+        //    }
+
+        //    // load shifts referenced
+        //    var shiftIds = schedules.Where(s => s.ShiftId.HasValue).Select(s => s.ShiftId!.Value).Distinct().ToList();
+        //    var shifts = shiftIds.Count == 0 ? new List<Domain.Entities.Employees.Shift>() : (await shiftRepo.FindAsync(x => shiftIds.Contains(x.Id))).ToList();
+        //    var shiftMap = shifts.ToDictionary(x => x.Id, x => x);
+
+        //    TimeOnly? minStart = null;
+        //    TimeOnly? maxEnd = null;
+
+        //    foreach (var s in schedules)
+        //    {
+        //        TimeOnly? start = s.StartTime;
+        //        TimeOnly? end = s.EndTime;
+
+        //        if (s.ShiftId.HasValue && shiftMap.TryGetValue(s.ShiftId.Value, out var sh))
+        //        {
+        //            start ??= sh.StartTime;
+        //            end ??= sh.EndTime;
+        //        }
+
+        //        if (start == null || end == null) continue;
+
+        //        minStart = minStart == null || start < minStart ? start : minStart;
+        //        maxEnd = maxEnd == null || end > maxEnd ? end : maxEnd;
+        //    }
+
+        //    if (minStart == null || maxEnd == null || minStart >= maxEnd)
+        //    {
+        //        return new AvailableSlotsResponse
+        //        {
+        //            Date = date,
+        //            CapacityPerHour = branch.CapacityPerHour,
+        //            Slots = new List<HourSlotDto>()
+        //        };
+        //    }
+
+        //    // hours from minStart to maxEnd (exclusive)
+        //    var hours = new List<TimeOnly>();
+        //    for (var t = minStart.Value; t < maxEnd.Value; t = t.AddHours(1))
+        //        hours.Add(t);
+
+        //    // Get employees working this day (from schedules)
+        //    // MVP schedule logic: employee has schedule row for DayOfWeek and IsOff=false and time covers hour
+        //    // We'll query schedules per hour.
+
+        //    var result = new AvailableSlotsResponse
+        //    {
+        //        Date = date,
+        //        CapacityPerHour = branch.CapacityPerHour
+        //    };
+
+        //    foreach (var hour in hours)
+        //    {
+        //        var slotStart = date.ToDateTime(hour);
+
+        //        // Capacity check: count bookings in this hour
+        //        var bookingRepo = _uow.Repository<Booking>();
+        //        var bookedCount = (await bookingRepo.FindAsync(b =>
+        //            b.BranchId == branchId &&
+        //            b.SlotHourStart == slotStart &&
+        //            b.Status != BookingStatus.Cancelled)).Count;
+
+        //        var available = branch.CapacityPerHour - bookedCount;
+        //        if (available <= 0)
+        //        {
+        //            result.Slots.Add(new HourSlotDto { Hour = hour, Booked = bookedCount, Available = 0 });
+        //            continue;
+        //        }
+
+        //        // Staff qualification check for this slot:
+        //        var ok = await HasQualifiedStaffForAllServices(slotStart, svcIds);
+        //        if (!ok)
+        //        {
+        //            // we treat as unavailable
+        //            result.Slots.Add(new HourSlotDto { Hour = hour, Booked = bookedCount, Available = 0 });
+        //            continue;
+        //        }
+
+        //        result.Slots.Add(new HourSlotDto { Hour = hour, Booked = bookedCount, Available = available });
+        //    }
+
+        //    return result;
+        //}
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+        public async Task<AvailableSlotsResponse> GetAvailableSlotsAsync(
+    int branchId,
+    DateOnly date,
+    List<int> serviceIds
+)
         {
-            // Validate branch
+            // 1) Validate branch
             var branch = await _uow.Repository<Branch>().GetByIdAsync(branchId);
             if (branch == null || !branch.IsActive)
                 throw new BusinessException("Branch not found", 404);
 
-            // Validate car exists
-            var car = await _uow.Repository<Car>().GetByIdAsync(carId);
-            if (car == null)
-                throw new BusinessException("Car not found", 404);
-
-            // Validate services + rates exist for body type
+            // 2) Validate services
             var svcIds = serviceIds.Distinct().ToList();
             if (svcIds.Count == 0)
                 throw new BusinessException("ServiceIds is required", 400);
 
-            await EnsureRatesExistForBodyType(svcIds, car.BodyType);
-
-            // Staff check (MVP): for each service, at least ONE qualified employee working that hour
-            // We'll evaluate for each hour slot.
-
-            // Build list of hours (example 9 AM -> 9 PM). You can adjust later.
-            //var hours = Enumerable.Range(9, 12).Select(h => new TimeOnly(h, 0)).ToList(); // 09:00 -> 20:00
-            // build hours dynamically from schedules+shifts for that date
+            // 3) Load schedules for that day
             var dow = date.DayOfWeek;
 
             var scheduleRepo = _uow.Repository<EmployeeWorkSchedule>();
             var shiftRepo = _uow.Repository<Domain.Entities.Employees.Shift>();
 
-            var schedules = await scheduleRepo.FindAsync(s => s.DayOfWeek == dow && !s.IsOff);
+            var schedules = await scheduleRepo.FindAsync(
+                s => s.DayOfWeek == dow && !s.IsOff
+            );
 
             if (schedules.Count == 0)
             {
@@ -77,9 +218,17 @@ namespace Forto.Application.Abstractions.Services.Bookings
                 };
             }
 
-            // load shifts referenced
-            var shiftIds = schedules.Where(s => s.ShiftId.HasValue).Select(s => s.ShiftId!.Value).Distinct().ToList();
-            var shifts = shiftIds.Count == 0 ? new List<Domain.Entities.Employees.Shift>() : (await shiftRepo.FindAsync(x => shiftIds.Contains(x.Id))).ToList();
+            // 4) Resolve shift times
+            var shiftIds = schedules
+                .Where(s => s.ShiftId.HasValue)
+                .Select(s => s.ShiftId!.Value)
+                .Distinct()
+                .ToList();
+
+            var shifts = shiftIds.Count == 0
+                ? new List<Domain.Entities.Employees.Shift>()
+                : (await shiftRepo.FindAsync(x => shiftIds.Contains(x.Id))).ToList();
+
             var shiftMap = shifts.ToDictionary(x => x.Id, x => x);
 
             TimeOnly? minStart = null;
@@ -112,53 +261,158 @@ namespace Forto.Application.Abstractions.Services.Bookings
                 };
             }
 
-            // hours from minStart to maxEnd (exclusive)
+            // 5) Build hour slots
             var hours = new List<TimeOnly>();
             for (var t = minStart.Value; t < maxEnd.Value; t = t.AddHours(1))
                 hours.Add(t);
 
-            // Get employees working this day (from schedules)
-            // MVP schedule logic: employee has schedule row for DayOfWeek and IsOff=false and time covers hour
-            // We'll query schedules per hour.
+            var bookingRepo = _uow.Repository<Booking>();
 
             var result = new AvailableSlotsResponse
             {
                 Date = date,
-                CapacityPerHour = branch.CapacityPerHour
+                CapacityPerHour = branch.CapacityPerHour,
+                Slots = new List<HourSlotDto>()
             };
 
+            // 6) Evaluate each hour
             foreach (var hour in hours)
             {
                 var slotStart = date.ToDateTime(hour);
 
-                // Capacity check: count bookings in this hour
-                var bookingRepo = _uow.Repository<Booking>();
+                // Capacity check
                 var bookedCount = (await bookingRepo.FindAsync(b =>
                     b.BranchId == branchId &&
                     b.SlotHourStart == slotStart &&
-                    b.Status != BookingStatus.Cancelled)).Count;
+                    b.Status != BookingStatus.Cancelled
+                )).Count;
 
                 var available = branch.CapacityPerHour - bookedCount;
                 if (available <= 0)
                 {
-                    result.Slots.Add(new HourSlotDto { Hour = hour, Booked = bookedCount, Available = 0 });
+                    result.Slots.Add(new HourSlotDto
+                    {
+                        Hour = hour,
+                        Booked = bookedCount,
+                        Available = 0
+                    });
                     continue;
                 }
 
-                // Staff qualification check for this slot:
-                var ok = await HasQualifiedStaffForAllServices(slotStart, svcIds);
-                if (!ok)
+                // Staff availability check (core logic)
+                var hasStaff = await HasQualifiedStaffForAllServices(slotStart, svcIds);
+                if (!hasStaff)
                 {
-                    // we treat as unavailable
-                    result.Slots.Add(new HourSlotDto { Hour = hour, Booked = bookedCount, Available = 0 });
+                    result.Slots.Add(new HourSlotDto
+                    {
+                        Hour = hour,
+                        Booked = bookedCount,
+                        Available = 0
+                    });
                     continue;
                 }
 
-                result.Slots.Add(new HourSlotDto { Hour = hour, Booked = bookedCount, Available = available });
+                result.Slots.Add(new HourSlotDto
+                {
+                    Hour = hour,
+                    Booked = bookedCount,
+                    Available = available
+                });
             }
 
             return result;
         }
+
+        //public async Task<BookingResponse> CreateAsync(CreateBookingRequest request)
+        //{
+        //    // Validate branch
+        //    var branch = await _uow.Repository<Branch>().GetByIdAsync(request.BranchId);
+        //    if (branch == null || !branch.IsActive)
+        //        throw new BusinessException("Branch not found", 404);
+
+        //    // Validate client + car
+        //    var client = await _uow.Repository<Client>().GetByIdAsync(request.ClientId);
+        //    if (client == null)
+        //        throw new BusinessException("Client not found", 404);
+
+        //    var car = await _uow.Repository<Car>().GetByIdAsync(request.CarId);
+        //    if (car == null || car.ClientId != client.Id)
+        //        throw new BusinessException("Car not found for this client", 404);
+
+        //    // normalize to hour slot
+        //    var slotHourStart = new DateTime(request.ScheduledStart.Year, request.ScheduledStart.Month, request.ScheduledStart.Day,
+        //        request.ScheduledStart.Hour, 0, 0);
+
+        //    // Enforce hour booking only (optional)
+        //    if (request.ScheduledStart.Minute != 0 || request.ScheduledStart.Second != 0)
+        //        throw new BusinessException("ScheduledStart must be on the hour (e.g. 14:00)", 400);
+
+        //    // Capacity check
+        //    var bookingRepo = _uow.Repository<Booking>();
+        //    var bookedCount = (await bookingRepo.FindAsync(b =>
+        //        b.BranchId == request.BranchId &&
+        //        b.SlotHourStart == slotHourStart &&
+        //        b.Status != BookingStatus.Cancelled)).Count;
+
+        //    if (bookedCount >= branch.CapacityPerHour)
+        //        throw new BusinessException("No capacity available for this hour", 409);
+
+        //    var serviceIds = request.ServiceIds.Distinct().ToList();
+        //    await EnsureRatesExistForBodyType(serviceIds, car.BodyType);
+
+        //    // Staff check: for each service, at least one qualified employee exists working at this hour
+        //    var staffOk = await HasQualifiedStaffForAllServices(slotHourStart, serviceIds);
+        //    if (!staffOk)
+        //        throw new BusinessException("No qualified employees available for one or more selected services at this time", 409);
+
+        //    // Build booking items with snapshots from rates
+        //    var rateRepo = _uow.Repository<ServiceRate>();
+        //    var rates = await rateRepo.FindAsync(r => r.IsActive && serviceIds.Contains(r.ServiceId) && r.BodyType == car.BodyType);
+        //    var rateMap = rates.ToDictionary(r => r.ServiceId, r => r);
+
+        //    var items = new List<BookingItem>();
+        //    foreach (var sid in serviceIds)
+        //    {
+        //        var rate = rateMap[sid];
+
+        //        items.Add(new BookingItem
+        //        {
+        //            ServiceId = sid,
+        //            BodyType = car.BodyType,
+        //            UnitPrice = rate.Price,
+        //            DurationMinutes = rate.DurationMinutes,
+        //            Status = BookingItemStatus.Pending
+        //        });
+        //    }
+
+        //    var totalPrice = items.Sum(i => i.UnitPrice);
+        //    var totalDuration = items.Sum(i => i.DurationMinutes); // MVP: sum
+
+        //    var booking = new Booking
+        //    {
+        //        BranchId = request.BranchId,
+        //        ClientId = client.Id,
+        //        CarId = car.Id,
+        //        ScheduledStart = request.ScheduledStart,
+        //        SlotHourStart = slotHourStart,
+        //        TotalPrice = totalPrice,
+        //        EstimatedDurationMinutes = totalDuration,
+        //        Status = BookingStatus.Pending,
+        //        Notes = request.Notes?.Trim(),
+        //        Items = items
+        //    };
+
+        //    await bookingRepo.AddAsync(booking);
+        //    await _uow.SaveChangesAsync();
+
+        //    return Map(booking);
+        //}
+
+
+
+
+
+
 
         public async Task<BookingResponse> CreateAsync(CreateBookingRequest request)
         {
@@ -176,11 +430,48 @@ namespace Forto.Application.Abstractions.Services.Bookings
             if (car == null || car.ClientId != client.Id)
                 throw new BusinessException("Car not found for this client", 404);
 
+            // ✅ Validate creator (who created this booking)
+            int? createdByEmployeeId = null;
+            int? createdByClientId = null;
+
+            if (request.CreatedByType == BookingCreatedByType.Employee)
+            {
+                if (!request.CreatedByEmployeeId.HasValue)
+                    throw new BusinessException("CreatedByEmployeeId is required", 400);
+
+                var emp = await _uow.Repository<Employee>().GetByIdAsync(request.CreatedByEmployeeId.Value);
+                if (emp == null || !emp.IsActive)
+                    throw new BusinessException("Employee not found", 404);
+
+                // Optional: restrict who can create bookings
+                if (emp.Role != EmployeeRole.Cashier && emp.Role != EmployeeRole.Supervisor && emp.Role != EmployeeRole.Admin)
+                    throw new BusinessException("Employee is not allowed to create bookings", 403);
+
+                createdByEmployeeId = emp.Id;
+                createdByClientId = null;
+            }
+            else if (request.CreatedByType == BookingCreatedByType.Client)
+            {
+                // لو UI مش بيبعت CreatedByClientId، نقدر نعتبره نفس clientId بتاع الحجز
+                // لكن لو تحبي تلزميه ابعتيه، سيبي السطرين دول:
+                createdByClientId = request.CreatedByClientId ?? client.Id;
+                createdByEmployeeId = null;
+
+                // (اختياري) تأكيد إن CreatedByClientId هو نفس العميل بتاع الحجز
+                if (createdByClientId != client.Id)
+                    throw new BusinessException("CreatedByClientId must match booking client", 400);
+            }
+            else
+            {
+                throw new BusinessException("CreatedByType is required", 400);
+            }
+
             // normalize to hour slot
-            var slotHourStart = new DateTime(request.ScheduledStart.Year, request.ScheduledStart.Month, request.ScheduledStart.Day,
+            var slotHourStart = new DateTime(
+                request.ScheduledStart.Year, request.ScheduledStart.Month, request.ScheduledStart.Day,
                 request.ScheduledStart.Hour, 0, 0);
 
-            // Enforce hour booking only (optional)
+            // Enforce hour booking only
             if (request.ScheduledStart.Minute != 0 || request.ScheduledStart.Second != 0)
                 throw new BusinessException("ScheduledStart must be on the hour (e.g. 14:00)", 400);
 
@@ -223,7 +514,7 @@ namespace Forto.Application.Abstractions.Services.Bookings
             }
 
             var totalPrice = items.Sum(i => i.UnitPrice);
-            var totalDuration = items.Sum(i => i.DurationMinutes); // MVP: sum
+            var totalDuration = items.Sum(i => i.DurationMinutes);
 
             var booking = new Booking
             {
@@ -236,7 +527,12 @@ namespace Forto.Application.Abstractions.Services.Bookings
                 EstimatedDurationMinutes = totalDuration,
                 Status = BookingStatus.Pending,
                 Notes = request.Notes?.Trim(),
-                Items = items
+                Items = items,
+
+                // ✅ creator info stored
+                CreatedByType = request.CreatedByType,
+                CreatedByEmployeeId = createdByEmployeeId,
+                CreatedByClientId = createdByClientId
             };
 
             await bookingRepo.AddAsync(booking);
@@ -245,17 +541,75 @@ namespace Forto.Application.Abstractions.Services.Bookings
             return Map(booking);
         }
 
+
+
+
+
+        //public async Task<BookingResponse?> GetByIdAsync(int bookingId)
+        //{
+        //    var repo = _uow.Repository<Booking>();
+        //    var booking = await repo.GetByIdAsync(bookingId);
+        //    if (booking == null) return null;
+
+        //    // GenericRepo ما بيجيبش Items، فهنجيب items query منفصلة
+        //    var items = await _uow.Repository<BookingItem>().FindAsync(i => i.BookingId == bookingId);
+        //    booking.Items = items.ToList();
+
+        //    return Map(booking);
+        //}
+
+
+
+
+
+
         public async Task<BookingResponse?> GetByIdAsync(int bookingId)
         {
-            var repo = _uow.Repository<Booking>();
-            var booking = await repo.GetByIdAsync(bookingId);
+            var bookingRepo = _uow.Repository<Booking>();
+            var itemRepo = _uow.Repository<BookingItem>();
+            var serviceRepo = _uow.Repository<Service>();
+
+            var booking = await bookingRepo.GetByIdAsync(bookingId);
             if (booking == null) return null;
 
-            // GenericRepo ما بيجيبش Items، فهنجيب items query منفصلة
-            var items = await _uow.Repository<BookingItem>().FindAsync(i => i.BookingId == bookingId);
-            booking.Items = items.ToList();
+            // 1) load booking items
+            var items = await itemRepo.FindAsync(i => i.BookingId == bookingId);
 
-            return Map(booking);
+            // 2) load services names
+            var serviceIds = items.Select(i => i.ServiceId).Distinct().ToList();
+            var services = await serviceRepo.FindAsync(s => serviceIds.Contains(s.Id));
+            var serviceMap = services.ToDictionary(s => s.Id, s => s.Name);
+
+            // 3) map response
+            return new BookingResponse
+            {
+                Id = booking.Id,
+                BranchId = booking.BranchId,
+                ClientId = booking.ClientId,
+                CarId = booking.CarId,
+                ScheduledStart = booking.ScheduledStart,
+                SlotHourStart = booking.SlotHourStart,
+                TotalPrice = booking.TotalPrice,
+                EstimatedDurationMinutes = booking.EstimatedDurationMinutes,
+                Status = booking.Status,
+
+                Items = items.Select(i =>
+                {
+                    serviceMap.TryGetValue(i.ServiceId, out var serviceName);
+
+                    return new BookingItemResponse
+                    {
+                        Id = i.Id,
+                        ServiceId = i.ServiceId,
+                        ServiceName = serviceName ?? "",   // ✅ هنا الاسم
+                        BodyType = i.BodyType,
+                        UnitPrice = i.UnitPrice,
+                        DurationMinutes = i.DurationMinutes,
+                        Status = i.Status,
+                        AssignedEmployeeId = i.AssignedEmployeeId
+                    };
+                }).ToList()
+            };
         }
 
 
@@ -474,17 +828,6 @@ namespace Forto.Application.Abstractions.Services.Bookings
 
         return MapItem(item);
     }
-
-
-
-
-
-
-
-
-
-
-
 
 
 
@@ -801,8 +1144,13 @@ namespace Forto.Application.Abstractions.Services.Bookings
                 CarId = car.Id,
                 ScheduledStart = request.ScheduledStart,
                 ServiceIds = request.ServiceIds,
-                Notes = request.Notes
+                Notes = request.Notes,
+
+                CreatedByType = request.CreatedByType,
+                CreatedByEmployeeId = request.CreatedByEmployeeId,
+                CreatedByClientId = request.CreatedByType == BookingCreatedByType.Client ? client.Id : request.CreatedByClientId
             };
+
 
             var bookingResponse = await CreateAsync(create);
 

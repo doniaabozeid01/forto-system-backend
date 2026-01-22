@@ -77,9 +77,6 @@ namespace Forto.Api.Controllers
 
 
 
-
-
-
         [HttpPost("pos")]
         public async Task<IActionResult> CreatePosInvoice([FromBody] CreatePosInvoiceRequest request)
         {

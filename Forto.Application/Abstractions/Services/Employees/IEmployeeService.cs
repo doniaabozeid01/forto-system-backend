@@ -14,5 +14,6 @@ namespace Forto.Application.Abstractions.Services.Employees
         Task<IReadOnlyList<EmployeeResponse>> GetAllAsync();
         Task<EmployeeResponse?> UpdateAsync(int id, UpdateEmployeeRequest request);
         Task<bool> DeleteAsync(int id);
+        Task<EmployeeResponse> CreateEmployeeUserAsync(CreateEmployeeUserRequest req);
     }
 }

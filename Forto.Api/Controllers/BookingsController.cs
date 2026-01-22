@@ -20,11 +20,11 @@ namespace Forto.Api.Controllers
         }
 
         [HttpGet("available-slots")]
-        public async Task<IActionResult> AvailableSlots([FromQuery] int branchId, [FromQuery] string date, [FromQuery] int carId, [FromQuery] string serviceIds)
+        public async Task<IActionResult> AvailableSlots([FromQuery] int branchId, [FromQuery] string date,[FromQuery] string serviceIds)
         {
             var parsedDate = DateOnly.Parse(date); // "2026-01-11"
             var ids = serviceIds.Split(',', StringSplitOptions.RemoveEmptyEntries).Select(int.Parse).ToList();
-            var data = await _service.GetAvailableSlotsAsync(branchId, parsedDate, carId, ids);
+            var data = await _service.GetAvailableSlotsAsync(branchId, parsedDate, ids);
             return OkResponse(data, "OK");
         }
 
@@ -83,6 +83,18 @@ namespace Forto.Api.Controllers
             await _adminService.CancelBookingAsync(bookingId, request);
             return OkResponse(new { bookingId }, "Booking cancelled");
         }
+
+
+
+
+
+        [HttpPut("{bookingId:int}/assign")]
+        public async Task<IActionResult> Assign(int bookingId, [FromBody] AssignBookingEmployeesRequest request)
+        {
+            var data = await _adminService.AssignEmployeesAsync(bookingId, request);
+            return OkResponse(data, "Employees assigned");
+        }
+
     }
 
 }

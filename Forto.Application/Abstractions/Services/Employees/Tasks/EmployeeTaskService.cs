@@ -16,9 +16,11 @@ namespace Forto.Application.Abstractions.Services.Employees.Tasks
 {
     public class EmployeeTaskService : IEmployeeTaskService
     {
+
         private readonly IUnitOfWork _uow;
 
         public EmployeeTaskService(IUnitOfWork uow) => _uow = uow;
+
 
         public async Task<EmployeeTasksPageResponse> GetTasksAsync(int employeeId, DateOnly date)
         {
@@ -81,11 +83,15 @@ namespace Forto.Application.Abstractions.Services.Employees.Tasks
                 bookingIds.Contains(i.BookingId) &&
                 qualifiedServiceIds.Contains(i.ServiceId) &&
                 (
-                    (i.Status == BookingItemStatus.Pending && i.AssignedEmployeeId == null)
+                    // Pending (free OR assigned to me)
+                    (i.Status == BookingItemStatus.Pending &&
+                        (i.AssignedEmployeeId == null || i.AssignedEmployeeId == employeeId))
                     ||
+                    // InProgress assigned to me
                     (i.Status == BookingItemStatus.InProgress && i.AssignedEmployeeId == employeeId)
                 )
             );
+
 
             if (items.Count == 0)
                 return new EmployeeTasksPageResponse { EmployeeId = employeeId, Date = date };
@@ -137,8 +143,13 @@ namespace Forto.Application.Abstractions.Services.Employees.Tasks
                       })
                       .ToList();
 
-            var availableItems = filtered.Where(i => i.Status == BookingItemStatus.Pending && i.AssignedEmployeeId == null);
-            var myActiveItems = filtered.Where(i => i.Status == BookingItemStatus.InProgress && i.AssignedEmployeeId == employeeId);
+            var availableItems = filtered
+                .Where(i => i.Status == BookingItemStatus.Pending)
+                .ToList();
+
+            var myActiveItems = filtered
+                .Where(i => i.Status == BookingItemStatus.InProgress && i.AssignedEmployeeId == employeeId)
+                .ToList();
 
             return new EmployeeTasksPageResponse
             {
@@ -147,9 +158,9 @@ namespace Forto.Application.Abstractions.Services.Employees.Tasks
                 Available = MapItems(availableItems),
                 MyActive = MapItems(myActiveItems)
             };
+
         }
 
 
     }
-
 }

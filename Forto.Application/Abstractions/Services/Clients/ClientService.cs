@@ -1,9 +1,12 @@
 ﻿using Forto.Api.Common;
 using Forto.Application.Abstractions.Repositories;
 using Forto.Application.Abstractions.Services.Clients;
+using Forto.Application.DTOs.Bookings.ClientBooking;
 using Forto.Application.DTOs.Cars;
 using Forto.Application.DTOs.Clients;
+using Forto.Domain.Entities.Bookings;
 using Forto.Domain.Entities.Clients;
+using Forto.Domain.Enum;
 using System;
 using System.Collections.Generic;
 using System.Linq;
@@ -211,6 +214,107 @@ namespace Forto.Application.Abstractions.Services.Clients
         };
 
         private static string NormalizePhone(string? phone) => (phone ?? "").Trim();
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+        public async Task<ClientBookingsByStatusResponse> GetClientBookingsByPhoneAsync(string phone)
+        {
+            var normalized = NormalizePhone(phone);
+            if (string.IsNullOrWhiteSpace(normalized))
+                throw new BusinessException("Invalid phone", 400);
+
+            var clientRepo = _uow.Repository<Client>();
+            var bookingRepo = _uow.Repository<Booking>();
+            var carRepo = _uow.Repository<Car>();
+            var itemRepo = _uow.Repository<BookingItem>();
+
+            var client = (await clientRepo.FindAsync(c => c.PhoneNumber == normalized)).FirstOrDefault();
+            if (client == null)
+                throw new BusinessException("Client not found", 404);
+
+            // bookings for client
+            var bookings = await bookingRepo.FindAsync(b => b.ClientId == client.Id);
+
+            if (bookings.Count == 0)
+                return new ClientBookingsByStatusResponse();
+
+            // cars for plate numbers
+            var carIds = bookings.Select(b => b.CarId).Distinct().ToList();
+            var cars = await carRepo.FindAsync(c => carIds.Contains(c.Id));
+            var carMap = cars.ToDictionary(c => c.Id, c => c);
+
+            // items count per booking (optional)
+            var bookingIds = bookings.Select(b => b.Id).ToList();
+            var items = await itemRepo.FindAsync(i => bookingIds.Contains(i.BookingId));
+            var itemsCountMap = items.GroupBy(i => i.BookingId).ToDictionary(g => g.Key, g => g.Count());
+
+            BookingListItemDto MapBooking(Booking b)
+            {
+                carMap.TryGetValue(b.CarId, out var car);
+                itemsCountMap.TryGetValue(b.Id, out var cnt);
+
+                return new BookingListItemDto
+                {
+                    BookingId = b.Id,
+                    ScheduledStart = b.ScheduledStart,
+                    TotalPrice = b.TotalPrice,
+                    EstimatedDurationMinutes = b.EstimatedDurationMinutes,
+                    Status = b.Status,
+                    CarId = b.CarId,
+                    PlateNumber = car?.PlateNumber ?? "",
+                    ServicesCount = cnt
+                };
+            }
+
+            // group
+            var resp = new ClientBookingsByStatusResponse();
+
+            foreach (var b in bookings.OrderByDescending(x => x.ScheduledStart))
+            {
+                var dto = MapBooking(b);
+
+                switch (b.Status)
+                {
+                    case BookingStatus.Pending:
+                        resp.Pending.Add(dto);
+                        break;
+                    case BookingStatus.InProgress:
+                        resp.InProgress.Add(dto);
+                        break;
+                    case BookingStatus.Completed:
+                        resp.Completed.Add(dto);
+                        break;
+                    case BookingStatus.Cancelled:
+                        resp.Cancelled.Add(dto);
+                        break;
+                }
+            }
+
+            return resp;
+        }
 
     }
 }

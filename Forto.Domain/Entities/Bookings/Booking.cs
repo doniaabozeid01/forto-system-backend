@@ -34,5 +34,17 @@ namespace Forto.Domain.Entities.Bookings
         public string? Notes { get; set; }
 
         public ICollection<BookingItem> Items { get; set; } = new List<BookingItem>();
+
+
+
+        //public string? CreatedByUserId { get; set; }          // Identity user id
+        public BookingCreatedByType CreatedByType { get; set; } // Client / Employee / System
+
+        public int? CreatedByEmployeeId { get; set; }         // if employee created
+        public int? CreatedByClientId { get; set; }           // if client created
+
+
+
+
     }
 }

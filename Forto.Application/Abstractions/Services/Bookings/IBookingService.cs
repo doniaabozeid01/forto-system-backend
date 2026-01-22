@@ -10,7 +10,7 @@ namespace Forto.Application.Abstractions.Services.Bookings
 {
     public interface IBookingService
     {
-        Task<AvailableSlotsResponse> GetAvailableSlotsAsync(int branchId, DateOnly date, int carId, List<int> serviceIds);
+        //Task<AvailableSlotsResponse> GetAvailableSlotsAsync(int branchId, DateOnly date, int carId, List<int> serviceIds);
 
         Task<BookingResponse> CreateAsync(CreateBookingRequest request);
         Task<BookingResponse?> GetByIdAsync(int bookingId);
@@ -19,7 +19,11 @@ namespace Forto.Application.Abstractions.Services.Bookings
         Task<BookingItemResponse> CompleteItemAsync(int itemId, int employeeId);
 
         Task<BookingResponse> QuickCreateAsync(QuickCreateBookingRequest request);
-
+        Task<AvailableSlotsResponse> GetAvailableSlotsAsync(
+    int branchId,
+    DateOnly date,
+    List<int> serviceIds
+);
         // Admin
         //Task CancelBookingItemAsync(int itemId, CashierActionRequest request);
         //Task CancelBookingAsync(int bookingId, CashierActionRequest request);

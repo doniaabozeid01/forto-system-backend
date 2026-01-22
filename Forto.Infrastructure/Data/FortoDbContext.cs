@@ -14,10 +14,13 @@ using Forto.Domain.Entities.Employees;
 using Forto.Domain.Entities.Inventory;
 using Forto.Domain.Entities.Ops;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.AspNetCore.Identity.EntityFrameworkCore;
+using Microsoft.EntityFrameworkCore;
+using Forto.Domain.Entities.Identity;
 
 namespace Forto.Infrastructure.Data
 {
-    public class FortoDbContext : DbContext
+    public class FortoDbContext : IdentityDbContext<ApplicationUser, ApplicationRole, string>
     {
         public FortoDbContext(DbContextOptions<FortoDbContext> options) : base(options) { }
 

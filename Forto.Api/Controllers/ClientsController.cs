@@ -58,6 +58,16 @@ namespace Forto.Api.Controllers
             if (data == null) return OkResponse<object?>(null, "Client not found");
             return OkResponse(data, "OK");
         }
+
+
+
+        [HttpGet("bookings/by-phone")]
+        public async Task<IActionResult> GetBookingsByPhone([FromQuery] string phone)
+        {
+            var data = await _service.GetClientBookingsByPhoneAsync(phone);
+            return OkResponse(data, "OK");
+        }
+
     }
 
 }

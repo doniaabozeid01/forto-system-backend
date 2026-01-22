@@ -1,4 +1,5 @@
-﻿using Forto.Application.DTOs.Clients;
+﻿using Forto.Application.DTOs.Bookings.ClientBooking;
+using Forto.Application.DTOs.Clients;
 using System;
 using System.Collections.Generic;
 using System.Linq;
@@ -17,5 +18,9 @@ namespace Forto.Application.Abstractions.Services.Clients
 
         //Task<ClientLookupResponse?> LookupByPhoneAsync(string phone);
         Task<IReadOnlyList<ClientLookupResponse>> SearchByPhoneAsync(string phonePrefix, int take = 10);
+
+
+        Task<ClientBookingsByStatusResponse> GetClientBookingsByPhoneAsync(string phone);
+
     }
 }

@@ -1,5 +1,6 @@
 ﻿using Forto.Application.Abstractions.Services.Employees;
 using Forto.Application.DTOs.Employees;
+using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
 
@@ -58,5 +59,17 @@ namespace Forto.Api.Controllers
 
             return OkResponse(new {}, "Employee deleted");
         }
+
+
+
+        [HttpPost("admin/employees/create-user")]
+        public async Task<IActionResult> CreateEmployeeUser([FromBody] CreateEmployeeUserRequest req)
+        {
+            var data = await _employeeService.CreateEmployeeUserAsync(req);
+            return OkResponse(data, "Employee user created");
+        }
+
+
+
     }
 }

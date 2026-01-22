@@ -4,6 +4,7 @@ using System.ComponentModel.DataAnnotations;
 using System.Linq;
 using System.Text;
 using System.Threading.Tasks;
+using Forto.Domain.Enum;
 
 namespace Forto.Application.DTOs.Bookings
 {
@@ -23,6 +24,13 @@ namespace Forto.Application.DTOs.Bookings
 
         [Required, MinLength(1)]
         public List<int> ServiceIds { get; set; } = new();
+
+
+
+        public BookingCreatedByType CreatedByType { get; set; }
+        public int? CreatedByEmployeeId { get; set; }
+        public int? CreatedByClientId { get; set; }
+
 
         public string? Notes { get; set; }
     }

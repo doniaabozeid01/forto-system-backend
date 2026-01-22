@@ -1,4 +1,5 @@
-﻿using Forto.Domain.Enum;
+﻿using Forto.Domain.Entities.Identity;
+using Forto.Domain.Enum;
 using System;
 using System.Collections.Generic;
 using System.Linq;
@@ -14,6 +15,8 @@ namespace Forto.Domain.Entities.Employees
         public string PhoneNumber { get; set; } = "";
         public bool IsActive { get; set; } = true;
 
+        public string? UserId { get; set; }
+        public ApplicationUser? User { get; set; }
         public EmployeeRole Role { get; set; } = EmployeeRole.Worker;
 
         public ICollection<EmployeeWorkSchedule> WorkSchedules { get; set; } = new List<EmployeeWorkSchedule>();

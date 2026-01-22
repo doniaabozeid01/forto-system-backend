@@ -7,7 +7,9 @@ using Forto.Api.Common;
 using Forto.Application.Abstractions.Repositories;
 using Forto.Application.Abstractions.Services.Bookings.Closing;
 using Forto.Application.Abstractions.Services.Invoices;
+using Forto.Application.Abstractions.Services.Schedule;
 using Forto.Application.DTOs.Billings;
+using Forto.Application.DTOs.Bookings;
 using Forto.Domain.Entities.Bookings;
 using Forto.Domain.Entities.Employees;
 using Forto.Domain.Entities.Ops;
@@ -20,15 +22,18 @@ namespace Forto.Application.Abstractions.Services.Bookings.Admin
     {
         private readonly IUnitOfWork _uow;
         private readonly IInvoiceService _invoiceService;
+        private readonly IBookingService _bookingService;
         private readonly IBookingClosingService _closingService;
+        private readonly IEmployeeScheduleService _scheduleService;
 
-        public BookingAdminService(IUnitOfWork uow, IInvoiceService invoiceService, IBookingClosingService closingService)
+        public BookingAdminService(IUnitOfWork uow, IInvoiceService invoiceService,IBookingService bookingService , IBookingClosingService closingService, IEmployeeScheduleService scheduleService)
         {
             _uow = uow;
             _invoiceService = invoiceService;
+            _bookingService = bookingService;
             _closingService = closingService;
+            _scheduleService = scheduleService;
         }
-
 
         // Admin
 
@@ -373,23 +378,6 @@ namespace Forto.Application.Abstractions.Services.Bookings.Admin
         //    }
         //}
 
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
         public async Task CancelBookingItemAsync(int itemId, CashierActionRequest request)
         {
             await RequireCashierAsync(request.CashierId);
@@ -517,28 +505,6 @@ namespace Forto.Application.Abstractions.Services.Bookings.Admin
             }
         }
 
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
         public async Task CancelBookingAsync(int bookingId, CashierActionRequest request)
         {
             await RequireCashierAsync(request.CashierId);
@@ -616,7 +582,6 @@ namespace Forto.Application.Abstractions.Services.Bookings.Admin
 
             await _invoiceService.EnsureInvoiceForBookingAsync(bookingId);
         }
-
 
         //private async Task RecalculateBookingTotalsAsync(int bookingId, bool save = true)
         //{
@@ -725,6 +690,81 @@ namespace Forto.Application.Abstractions.Services.Bookings.Admin
         //    if (save) await _uow.SaveChangesAsync();
         //}
 
+        public async Task<BookingResponse> AssignEmployeesAsync(int bookingId, AssignBookingEmployeesRequest request)
+        {
+            await RequireCashierAsync(request.CashierId);
+
+            var bookingRepo = _uow.Repository<Booking>();
+            var itemRepo = _uow.Repository<BookingItem>();
+            var empRepo = _uow.Repository<Employee>();
+            var empServiceRepo = _uow.Repository<EmployeeService>();
+
+            var booking = await bookingRepo.GetByIdAsync(bookingId);
+            if (booking == null) throw new BusinessException("Booking not found", 404);
+
+            if (booking.Status == BookingStatus.Cancelled || booking.Status == BookingStatus.Completed)
+                throw new BusinessException("Cannot assign employees for a closed booking", 409);
+
+            if (request.Assignments == null || request.Assignments.Count == 0)
+                throw new BusinessException("Assignments is required", 400);
+
+            // load booking items tracking
+            var items = await itemRepo.FindTrackingAsync(i => i.BookingId == bookingId);
+            var itemMap = items.ToDictionary(i => i.Id, i => i);
+
+            // validate bookingItemIds
+            var badItemIds = request.Assignments
+                .Select(a => a.BookingItemId)
+                .Distinct()
+                .Where(id => !itemMap.ContainsKey(id))
+                .ToList();
+
+            if (badItemIds.Any())
+                throw new BusinessException("Some booking items do not belong to this booking", 400,
+                    new Dictionary<string, string[]>
+                    {
+                        ["bookingItemId"] = badItemIds.Select(x => x.ToString()).ToArray()
+                    });
+
+            foreach (var a in request.Assignments)
+            {
+                var item = itemMap[a.BookingItemId];
+
+                // do not assign done/cancelled
+                if (item.Status == BookingItemStatus.Done || item.Status == BookingItemStatus.Cancelled)
+                    throw new BusinessException($"Cannot assign for item {item.Id} in status {item.Status}", 409);
+
+                var emp = await empRepo.GetByIdAsync(a.EmployeeId);
+                if (emp == null || !emp.IsActive)
+                    throw new BusinessException($"Employee {a.EmployeeId} not found", 404);
+
+                // working check at booking time
+                var isWorking = await _scheduleService.IsEmployeeWorkingAsync(a.EmployeeId, booking.ScheduledStart);
+                if (!isWorking)
+                    throw new BusinessException($"Employee {a.EmployeeId} is not working at this time", 409);
+
+                // qualification check
+                var qualified = await empServiceRepo.AnyAsync(es =>
+                    es.EmployeeId == a.EmployeeId &&
+                    es.ServiceId == item.ServiceId &&
+                    es.IsActive);
+
+                if (!qualified)
+                    throw new BusinessException($"Employee {a.EmployeeId} is not qualified for service {item.ServiceId}", 409);
+
+                // assign
+                item.AssignedEmployeeId = a.EmployeeId;
+                itemRepo.Update(item);
+            }
+
+            await _uow.SaveChangesAsync();
+
+            // return fresh booking with items (recommended)
+            var refreshed = await _bookingService.GetByIdAsync(bookingId);
+            if (refreshed == null) throw new BusinessException("Booking not found", 404);
+            return refreshed;
+
+        }
 
     }
 
