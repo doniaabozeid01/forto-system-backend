@@ -22,6 +22,7 @@ namespace Forto.Application.Abstractions.Repositories
 
         void Update(T entity);
         void Delete(T entity); // هنا ممكن تخليه soft delete في التنفيذ
+        void HardDelete(T entity); // هنا ممكن تخليه soft delete في التنفيذ
 
         Task<bool> AnyAsync(Expression<Func<T, bool>> predicate);
         Task<int> CountAsync(Expression<Func<T, bool>> predicate);

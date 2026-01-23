@@ -6,6 +6,7 @@ using Forto.Application.DTOs.Billings.Gifts;
 using Forto.Domain.Entities.Billings;
 using Forto.Domain.Entities.Bookings;
 using Forto.Domain.Entities.Catalog;
+using Forto.Domain.Entities.Clients;
 using Forto.Domain.Entities.Employees;
 using Forto.Domain.Entities.Inventory;
 using Forto.Domain.Entities.Ops;
@@ -842,9 +843,144 @@ namespace Forto.Application.Abstractions.Services.Invoices
 
 
 
+        //public async Task<InvoiceResponse> CreatePosInvoicePaidCashAsync(CreatePosInvoiceRequest request)
+        //{
+        //    // cashier role check (زي PayCash)
+        //    var empRepo = _uow.Repository<Employee>();
+        //    var cashier = await empRepo.GetByIdAsync(request.CashierId);
+        //    if (cashier == null || !cashier.IsActive)
+        //        throw new BusinessException("Cashier not found", 404);
+
+        //    if (!(cashier.Role == EmployeeRole.Cashier || cashier.Role == EmployeeRole.Supervisor || cashier.Role == EmployeeRole.Admin))
+        //        throw new BusinessException("Not allowed", 403);
+
+        //    var branch = await _uow.Repository<Branch>().GetByIdAsync(request.BranchId);
+        //    if (branch == null || !branch.IsActive)
+        //        throw new BusinessException("Branch not found", 404);
+
+        //    if (request.Items == null || request.Items.Count == 0)
+        //        throw new BusinessException("Items is required", 400);
+
+        //    var occurred = request.OccurredAt ?? DateTime.UtcNow;
+
+        //    var productRepo = _uow.Repository<Product>();
+        //    var stockRepo = _uow.Repository<BranchProductStock>();
+        //    var moveRepo = _uow.Repository<ProductMovement>();
+        //    var invRepo = _uow.Repository<Invoice>();
+        //    var lineRepo = _uow.Repository<InvoiceLine>();
+
+        //    var productIds = request.Items.Select(x => x.ProductId).Distinct().ToList();
+        //    var products = await productRepo.FindAsync(p => productIds.Contains(p.Id) && p.IsActive);
+        //    var pMap = products.ToDictionary(p => p.Id, p => p);
+
+        //    var missing = productIds.Where(id => !pMap.ContainsKey(id)).ToList();
+        //    if (missing.Any())
+        //        throw new BusinessException("Some products not found", 404,
+        //            new Dictionary<string, string[]> { ["productId"] = missing.Select(x => x.ToString()).ToArray() });
+
+        //    var stocks = await stockRepo.FindTrackingAsync(s => s.BranchId == request.BranchId && productIds.Contains(s.ProductId));
+        //    var sMap = stocks.ToDictionary(s => s.ProductId, s => s);
+
+        //    // stock check
+        //    foreach (var it in request.Items)
+        //    {
+        //        if (!sMap.TryGetValue(it.ProductId, out var st))
+        //            throw new BusinessException("Product stock not found in this branch", 409);
+
+        //        var available = st.OnHandQty - st.ReservedQty;
+        //        if (available < 0) available = 0;
+
+        //        if (available < it.Qty)
+        //            throw new BusinessException($"Not enough stock for product {it.ProductId}", 409);
+        //    }
+
+        //    // create invoice header (POS = BookingId null)
+        //    var invoice = new Invoice
+        //    {
+        //        BookingId = null,
+        //        BranchId = request.BranchId,
+        //        SubTotal = 0,
+        //        Discount = 0,
+        //        Total = 0,
+        //        Status = InvoiceStatus.Paid,
+        //        PaymentMethod = PaymentMethod.Cash,
+        //        PaidByEmployeeId = request.CashierId,
+        //        PaidAt = occurred
+        //    };
+
+        //    await invRepo.AddAsync(invoice);
+        //    await _uow.SaveChangesAsync(); // get invoice.Id
+
+        //    decimal subTotal = 0;
+
+        //    foreach (var it in request.Items)
+        //    {
+        //        var p = pMap[it.ProductId];
+        //        var st = sMap[it.ProductId];
+
+        //        // decrease stock
+        //        st.OnHandQty -= it.Qty;
+        //        stockRepo.Update(st);
+
+        //        // invoice line
+        //        var lineTotal = it.Qty * p.SalePrice;
+        //        subTotal += lineTotal;
+
+        //        await lineRepo.AddAsync(new InvoiceLine
+        //        {
+        //            InvoiceId = invoice.Id,
+        //            Description = $"Product: {p.Name}",
+        //            Qty = 1,                 // لو عايزة Qty decimal في InvoiceLine لازم نغيره، فمؤقتًا نخليها 1
+        //            UnitPrice = p.SalePrice,
+        //            Total = lineTotal
+        //        });
+
+        //        // movement SELL
+        //        await moveRepo.AddAsync(new ProductMovement
+        //        {
+        //            BranchId = request.BranchId,
+        //            ProductId = p.Id,
+        //            MovementType = ProductMovementType.Sell,
+        //            Qty = it.Qty,
+        //            UnitCostSnapshot = p.CostPerUnit,
+        //            TotalCost = it.Qty * p.CostPerUnit,
+        //            OccurredAt = occurred,
+        //            InvoiceId = invoice.Id,
+        //            BookingId = null,
+        //            BookingItemId = null,
+        //            RecordedByEmployeeId = request.CashierId,
+        //            Notes = request.Notes ?? "POS invoice"
+        //        });
+        //    }
+
+        //    invoice.SubTotal = subTotal;
+        //    invoice.Total = subTotal - invoice.Discount;
+        //    invRepo.Update(invoice);
+
+        //    await _uow.SaveChangesAsync();
+
+        //    var lines = await lineRepo.FindAsync(l => l.InvoiceId == invoice.Id);
+        //    invoice.Lines = lines.ToList();
+
+        //    return Map(invoice);
+        //}
+
+
+
+
+
+
+
+
+
+
+
+
+
+
         public async Task<InvoiceResponse> CreatePosInvoicePaidCashAsync(CreatePosInvoiceRequest request)
         {
-            // cashier role check (زي PayCash)
+            // cashier role check
             var empRepo = _uow.Repository<Employee>();
             var cashier = await empRepo.GetByIdAsync(request.CashierId);
             if (cashier == null || !cashier.IsActive)
@@ -862,6 +998,47 @@ namespace Forto.Application.Abstractions.Services.Invoices
 
             var occurred = request.OccurredAt ?? DateTime.UtcNow;
 
+            // ✅ 1) Resolve customer (optional)
+            int? clientId = null;
+            string? customerPhone = null;
+            string? customerName = null;
+
+            if (request.Customer != null && !string.IsNullOrWhiteSpace(request.Customer.PhoneNumber))
+            {
+                customerPhone = request.Customer.PhoneNumber.Trim();
+
+                var clientRepo = _uow.Repository<Client>();
+                var existingClient = (await clientRepo.FindAsync(c => c.PhoneNumber == customerPhone)).FirstOrDefault();
+
+                if (existingClient == null)
+                {
+                    existingClient = new Client
+                    {
+                        PhoneNumber = customerPhone,
+                        FullName = (request.Customer.FullName ?? "Walk-in").Trim(),
+                        Email = null,
+                        IsActive = true
+                    };
+                    await clientRepo.AddAsync(existingClient);
+                    await _uow.SaveChangesAsync(); // عشان Id
+                }
+                else
+                {
+                    // optional: update name if provided
+                    if (!string.IsNullOrWhiteSpace(request.Customer.FullName) &&
+                        !string.Equals(existingClient.FullName, request.Customer.FullName.Trim(), StringComparison.OrdinalIgnoreCase))
+                    {
+                        existingClient.FullName = request.Customer.FullName.Trim();
+                        clientRepo.Update(existingClient);
+                        await _uow.SaveChangesAsync();
+                    }
+                }
+
+                clientId = existingClient.Id;
+                customerName = existingClient.FullName;
+            }
+
+            // ===== existing logic =====
             var productRepo = _uow.Repository<Product>();
             var stockRepo = _uow.Repository<BranchProductStock>();
             var moveRepo = _uow.Repository<ProductMovement>();
@@ -880,7 +1057,6 @@ namespace Forto.Application.Abstractions.Services.Invoices
             var stocks = await stockRepo.FindTrackingAsync(s => s.BranchId == request.BranchId && productIds.Contains(s.ProductId));
             var sMap = stocks.ToDictionary(s => s.ProductId, s => s);
 
-            // stock check
             foreach (var it in request.Items)
             {
                 if (!sMap.TryGetValue(it.ProductId, out var st))
@@ -893,11 +1069,16 @@ namespace Forto.Application.Abstractions.Services.Invoices
                     throw new BusinessException($"Not enough stock for product {it.ProductId}", 409);
             }
 
-            // create invoice header (POS = BookingId null)
+            // ✅ 2) create invoice header with customer info (POS = BookingId null)
             var invoice = new Invoice
             {
                 BookingId = null,
                 BranchId = request.BranchId,
+
+                ClientId = clientId,
+                CustomerPhone = customerPhone,
+                CustomerName = customerName,
+
                 SubTotal = 0,
                 Discount = 0,
                 Total = 0,
@@ -917,11 +1098,9 @@ namespace Forto.Application.Abstractions.Services.Invoices
                 var p = pMap[it.ProductId];
                 var st = sMap[it.ProductId];
 
-                // decrease stock
                 st.OnHandQty -= it.Qty;
                 stockRepo.Update(st);
 
-                // invoice line
                 var lineTotal = it.Qty * p.SalePrice;
                 subTotal += lineTotal;
 
@@ -929,12 +1108,11 @@ namespace Forto.Application.Abstractions.Services.Invoices
                 {
                     InvoiceId = invoice.Id,
                     Description = $"Product: {p.Name}",
-                    Qty = 1,                 // لو عايزة Qty decimal في InvoiceLine لازم نغيره، فمؤقتًا نخليها 1
+                    Qty = 1, // لو عايزة Qty تظهر صح، هنغيرها بعدين لـ decimal
                     UnitPrice = p.SalePrice,
                     Total = lineTotal
                 });
 
-                // movement SELL
                 await moveRepo.AddAsync(new ProductMovement
                 {
                     BranchId = request.BranchId,
@@ -963,6 +1141,349 @@ namespace Forto.Application.Abstractions.Services.Invoices
 
             return Map(invoice);
         }
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+        //public async Task<InvoiceListResponse> ListAsync(InvoiceListQuery query)
+        //{
+        //    if (query.Page <= 0) query.Page = 1;
+        //    if (query.PageSize <= 0) query.PageSize = 20;
+
+        //    var branch = await _uow.Repository<Branch>().GetByIdAsync(query.BranchId);
+        //    if (branch == null || !branch.IsActive)
+        //        throw new BusinessException("Branch not found", 404);
+
+        //    var invRepo = _uow.Repository<Invoice>();
+        //    var lineRepo = _uow.Repository<InvoiceLine>();
+
+        //    // date range -> datetime range
+        //    DateTime? fromStart = null;
+        //    DateTime? toEnd = null;
+
+        //    if (!string.IsNullOrWhiteSpace(query.From))
+        //    {
+        //        if (!DateOnly.TryParse(query.From, out var fromDate))
+        //            throw new BusinessException("Invalid From date format. Use yyyy-MM-dd", 400);
+
+        //        fromStart = fromDate.ToDateTime(TimeOnly.MinValue);
+        //    }
+
+        //    if (!string.IsNullOrWhiteSpace(query.To))
+        //    {
+        //        if (!DateOnly.TryParse(query.To, out var toDate))
+        //            throw new BusinessException("Invalid To date format. Use yyyy-MM-dd", 400);
+
+        //        toEnd = toDate.AddDays(1).ToDateTime(TimeOnly.MinValue); // inclusive day
+        //    }
+
+
+        //    // 1) load invoices for branch + optional filters
+        //    var invoices = await invRepo.FindAsync(i =>
+        //        i.BranchId == query.BranchId &&
+        //        (fromStart == null || (i.PaidAt ?? i.CreatedAt) >= fromStart) &&
+        //        (toEnd == null || (i.PaidAt ?? i.CreatedAt) < toEnd) &&
+        //        (query.PaymentMethod == null || query.PaymentMethod == "all" ||
+        //            (query.PaymentMethod == "cash" && i.PaymentMethod == PaymentMethod.Cash))
+        //    );
+
+        //    // 2) apply search Q in-memory (MVP)
+        //    // Q can be invoiceId, phone, name
+        //    if (!string.IsNullOrWhiteSpace(query.Q))
+        //    {
+        //        var q = query.Q.Trim();
+
+        //        // invoice id search
+        //        if (int.TryParse(q, out var invId))
+        //        {
+        //            invoices = invoices.Where(i => i.Id == invId).ToList();
+        //        }
+        //        else
+        //        {
+        //            invoices = invoices.Where(i =>
+        //                (!string.IsNullOrWhiteSpace(i.CustomerPhone) && i.CustomerPhone.Contains(q)) ||
+        //                (!string.IsNullOrWhiteSpace(i.CustomerName) && i.CustomerName.Contains(q))
+        //            ).ToList();
+        //        }
+        //    }
+
+        //    // Order newest first (PaidAt then CreatedAt)
+        //    invoices = invoices
+        //        .OrderByDescending(i => i.PaidAt ?? i.CreatedAt)
+        //        .ToList();
+
+        //    var totalCount = invoices.Count;
+        //    var totalRevenue = invoices
+        //        .Where(i => i.Status == InvoiceStatus.Paid)
+        //        .Sum(i => i.Total);
+
+        //    // pagination
+        //    var skip = (query.Page - 1) * query.PageSize;
+        //    var pageInvoices = invoices.Skip(skip).Take(query.PageSize).ToList();
+
+        //    if (pageInvoices.Count == 0)
+        //    {
+        //        return new InvoiceListResponse
+        //        {
+        //            Summary = new InvoiceListSummary { TotalCount = totalCount, TotalRevenue = totalRevenue },
+        //            Items = new List<InvoiceListItemDto>(),
+        //            Page = query.Page,
+        //            PageSize = query.PageSize
+        //        };
+        //    }
+
+        //    // 3) load lines for this page to build "services" column
+        //    var invoiceIds = pageInvoices.Select(i => i.Id).ToList();
+        //    var lines = await lineRepo.FindAsync(l => invoiceIds.Contains(l.InvoiceId));
+
+        //    var linesByInvoice = lines
+        //        .GroupBy(l => l.InvoiceId)
+        //        .ToDictionary(g => g.Key, g => g.ToList());
+
+        //    string BuildInvoiceContentText(List<InvoiceLine> invLines)
+        //    {
+        //        var texts = invLines
+        //            .Select(l => (l.Description ?? "").Trim())
+        //            .Where(d => !string.IsNullOrWhiteSpace(d))
+        //            .Distinct()
+        //            .ToList();
+
+        //        return string.Join(", ", texts);
+        //    }
+
+
+
+        //    var items = pageInvoices.Select(i =>
+        //    {
+        //        linesByInvoice.TryGetValue(i.Id, out var invLines);
+        //        invLines ??= new List<InvoiceLine>();
+
+        //        return new InvoiceListItemDto
+        //        {
+        //            InvoiceId = i.Id,
+        //            Date = i.PaidAt ?? i.CreatedAt,
+        //            PaymentMethod = i.PaymentMethod ?? PaymentMethod.Cash,
+        //            Total = i.Total,
+        //            CustomerName = i.CustomerName ?? "Walk-in",
+        //            CustomerPhone = i.CustomerPhone ?? "",
+        //            Services = BuildInvoiceContentText(invLines)
+        //        };
+        //    }).ToList();
+
+        //    var lineDtos = invLines
+        //        .OrderBy(l => l.Id)
+        //        .Select(l => new InvoiceLineListDto
+        //        {
+        //            LineId = l.Id,
+        //            Description = l.Description ?? "",
+        //            Qty = l.Qty,
+        //            UnitPrice = l.UnitPrice,
+        //            Total = l.Total
+        //        })
+        //        .ToList();
+
+        //    var itemsText = string.Join(", ",
+        //        lineDtos.Select(x => x.Description).Where(d => !string.IsNullOrWhiteSpace(d)).Distinct()
+        //    );
+
+        //    return new InvoiceListItemDto
+        //    {
+        //        InvoiceId = i.Id,
+        //        Date = i.PaidAt ?? i.CreatedAt,
+
+        //        PaymentMethod = i.PaymentMethod,
+        //        SubTotal = i.SubTotal,
+        //        Discount = i.Discount,
+        //        Total = i.Total,
+
+        //        CustomerName = i.CustomerName ?? "Walk-in",
+        //        CustomerPhone = i.CustomerPhone ?? "",
+
+        //        ItemsText = itemsText,   // اختياري للجدول
+        //        Lines = lineDtos         // ✅ التفاصيل اللي انتي عايزاها
+        //    };
+
+        //}
+
+
+
+
+
+
+
+
+
+
+
+        public async Task<InvoiceListResponse> ListAsync(InvoiceListQuery query)
+        {
+            if (query.Page <= 0) query.Page = 1;
+            if (query.PageSize <= 0) query.PageSize = 20;
+
+            var branch = await _uow.Repository<Branch>().GetByIdAsync(query.BranchId);
+            if (branch == null || !branch.IsActive)
+                throw new BusinessException("Branch not found", 404);
+
+            var invRepo = _uow.Repository<Invoice>();
+            var lineRepo = _uow.Repository<InvoiceLine>();
+
+            // date range -> datetime range
+            DateTime? fromStart = null;
+            DateTime? toEnd = null;
+
+            if (!string.IsNullOrWhiteSpace(query.From))
+            {
+                if (!DateOnly.TryParse(query.From, out var fromDate))
+                    throw new BusinessException("Invalid From date format. Use yyyy-MM-dd", 400);
+
+                fromStart = fromDate.ToDateTime(TimeOnly.MinValue);
+            }
+
+            if (!string.IsNullOrWhiteSpace(query.To))
+            {
+                if (!DateOnly.TryParse(query.To, out var toDate))
+                    throw new BusinessException("Invalid To date format. Use yyyy-MM-dd", 400);
+
+                toEnd = toDate.AddDays(1).ToDateTime(TimeOnly.MinValue);
+            }
+
+            // 1) load invoices
+            var invoices = await invRepo.FindAsync(i =>
+                i.BranchId == query.BranchId &&
+                (fromStart == null || (i.PaidAt ?? i.CreatedAt) >= fromStart) &&
+                (toEnd == null || (i.PaidAt ?? i.CreatedAt) < toEnd) &&
+                (query.PaymentMethod == null || query.PaymentMethod == "all" ||
+                    (query.PaymentMethod == "cash" && i.PaymentMethod == PaymentMethod.Cash))
+            );
+
+            // 2) search
+            if (!string.IsNullOrWhiteSpace(query.Q))
+            {
+                var q = query.Q.Trim();
+
+                if (int.TryParse(q, out var invId))
+                {
+                    invoices = invoices.Where(i => i.Id == invId).ToList();
+                }
+                else
+                {
+                    invoices = invoices.Where(i =>
+                        (!string.IsNullOrWhiteSpace(i.CustomerPhone) && i.CustomerPhone.Contains(q)) ||
+                        (!string.IsNullOrWhiteSpace(i.CustomerName) && i.CustomerName.Contains(q))
+                    ).ToList();
+                }
+            }
+
+            invoices = invoices.OrderByDescending(i => i.PaidAt ?? i.CreatedAt).ToList();
+
+            var totalCount = invoices.Count;
+            var totalRevenue = invoices
+                .Where(i => i.Status == InvoiceStatus.Paid)
+                .Sum(i => i.Total);
+
+            // pagination
+            var skip = (query.Page - 1) * query.PageSize;
+            var pageInvoices = invoices.Skip(skip).Take(query.PageSize).ToList();
+
+            if (pageInvoices.Count == 0)
+            {
+                return new InvoiceListResponse
+                {
+                    Summary = new InvoiceListSummary { TotalCount = totalCount, TotalRevenue = totalRevenue },
+                    Items = new List<InvoiceListItemDto>(),
+                    Page = query.Page,
+                    PageSize = query.PageSize
+                };
+            }
+
+            // 3) load lines for this page
+            var invoiceIds = pageInvoices.Select(i => i.Id).ToList();
+            var lines = await lineRepo.FindAsync(l => invoiceIds.Contains(l.InvoiceId));
+
+            var linesByInvoice = lines
+                .GroupBy(l => l.InvoiceId)
+                .ToDictionary(g => g.Key, g => g.ToList());
+
+            // helper: full text
+            string BuildInvoiceContentText(List<InvoiceLine> invLines)
+            {
+                var texts = invLines
+                    .Select(l => (l.Description ?? "").Trim())
+                    .Where(d => !string.IsNullOrWhiteSpace(d))
+                    .Distinct()
+                    .ToList();
+
+                return string.Join(", ", texts);
+            }
+
+            var items = pageInvoices.Select(inv =>
+            {
+                linesByInvoice.TryGetValue(inv.Id, out var invLines);
+                invLines ??= new List<InvoiceLine>();
+
+                var lineDtos = invLines
+                    .OrderBy(l => l.Id)
+                    .Select(l => new InvoiceLineListDto
+                    {
+                        LineId = l.Id,
+                        Description = l.Description ?? "",
+                        Qty = l.Qty,
+                        UnitPrice = l.UnitPrice,
+                        Total = l.Total
+                    })
+                    .ToList();
+
+                var itemsText = string.Join(", ",
+                    lineDtos.Select(x => x.Description)
+                            .Where(d => !string.IsNullOrWhiteSpace(d))
+                            .Distinct()
+                );
+
+                return new InvoiceListItemDto
+                {
+                    InvoiceId = inv.Id,
+                    Date = inv.PaidAt ?? inv.CreatedAt,
+
+                    PaymentMethod = inv.PaymentMethod ?? PaymentMethod.Cash,
+                    SubTotal = inv.SubTotal,
+                    Discount = inv.Discount,
+                    Total = inv.Total,
+
+                    CustomerName = inv.CustomerName ?? "",
+                    CustomerPhone = inv.CustomerPhone ?? "",
+
+                    // if you still want a simple string:
+                    //Services = BuildInvoiceContentText(invLines),
+
+                    ItemsText = itemsText,
+                    Lines = lineDtos
+                };
+            }).ToList();
+
+            return new InvoiceListResponse
+            {
+                Summary = new InvoiceListSummary
+                {
+                    TotalCount = totalCount,
+                    TotalRevenue = totalRevenue
+                },
+                Items = items,
+                Page = query.Page,
+                PageSize = query.PageSize
+            };
+        }
+
+
 
     }
 }

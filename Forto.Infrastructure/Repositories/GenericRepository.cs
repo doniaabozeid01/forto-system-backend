@@ -61,6 +61,22 @@ namespace Forto.Infrastructure.Repositories
             // _set.Remove(entity);
         }
 
+
+
+        public void HardDelete(T entity)
+        {
+            // Soft delete
+            //entity.IsDeleted = true;
+            //entity.UpdatedAt = DateTime.UtcNow;
+            //_set.Update(entity);
+             _set.Remove(entity);
+
+            // لو عايزة hard delete بدل soft:
+        }
+
+
+
+
         public async Task<bool> AnyAsync(Expression<Func<T, bool>> predicate)
             => await _set.AnyAsync(predicate);
 

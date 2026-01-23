@@ -95,6 +95,25 @@ namespace Forto.Api.Controllers
             return OkResponse(data, "Employees assigned");
         }
 
+
+
+
+
+
+
+
+        [HttpGet("today")]
+        public async Task<IActionResult> Today([FromQuery] int branchId, [FromQuery] string? date)
+        {
+            var d = string.IsNullOrWhiteSpace(date) ? DateOnly.FromDateTime(DateTime.Today) : DateOnly.Parse(date);
+            var data = await _service.GetTodayAsync(branchId, d);
+            return OkResponse(data, "OK");
+        }
+
+
+
+
+
     }
 
 }

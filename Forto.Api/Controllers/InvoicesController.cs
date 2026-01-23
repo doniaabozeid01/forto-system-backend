@@ -85,6 +85,19 @@ namespace Forto.Api.Controllers
         }
 
 
+
+
+
+        [HttpGet("list")]
+        public async Task<IActionResult> List([FromQuery] InvoiceListQuery query)
+        {
+            var data = await _service.ListAsync(query);
+            return OkResponse(data, "OK");
+        }
+
+
+
+
     }
 
 }

@@ -105,13 +105,26 @@ namespace Forto.Application.Abstractions.Services.Cars
             return Map(car);
         }
 
+        //public async Task<bool> DeleteAsync(int carId)
+        //{
+        //    var carRepo = _uow.Repository<Car>();
+        //    var car = await carRepo.GetByIdAsync(carId);
+        //    if (car == null) return false;
+
+        //    carRepo.Delete(car); // soft delete
+        //    await _uow.SaveChangesAsync();
+        //    return true;
+        //}
+
+
         public async Task<bool> DeleteAsync(int carId)
         {
             var carRepo = _uow.Repository<Car>();
             var car = await carRepo.GetByIdAsync(carId);
             if (car == null) return false;
 
-            carRepo.Delete(car); // soft delete
+            //carRepo.Delete(car); // soft delete
+            carRepo.HardDelete(car);
             await _uow.SaveChangesAsync();
             return true;
         }

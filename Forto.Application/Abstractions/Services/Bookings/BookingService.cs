@@ -18,6 +18,7 @@ using Forto.Application.DTOs.Billings;
 using Forto.Domain.Entities.Inventory;
 using Forto.Application.Abstractions.Services.Bookings.Closing;
 using Forto.Application.Abstractions.Services.Schedule;
+using Forto.Application.DTOs.Bookings.ClientBooking;
 
 namespace Forto.Application.Abstractions.Services.Bookings
 {
@@ -1470,6 +1471,116 @@ namespace Forto.Application.Abstractions.Services.Bookings
 
 
 
+        public async Task<TodayBookingsResponse> GetTodayAsync(int branchId, DateOnly date)
+        {
+            var branch = await _uow.Repository<Branch>().GetByIdAsync(branchId);
+            if (branch == null || !branch.IsActive)
+                throw new BusinessException("Branch not found", 404);
+
+            var dayStart = date.ToDateTime(TimeOnly.MinValue);
+            var dayEnd = date.AddDays(1).ToDateTime(TimeOnly.MinValue);
+
+            var bookingRepo = _uow.Repository<Booking>();
+            var bookings = await bookingRepo.FindAsync(b =>
+                b.BranchId == branchId &&
+                b.ScheduledStart >= dayStart &&
+                b.ScheduledStart < dayEnd);
+
+            if (bookings.Count == 0)
+                return new TodayBookingsResponse { BranchId = branchId, Date = date };
+
+            var bookingIds = bookings.Select(b => b.Id).ToList();
+
+            // clients + cars
+            var clientIds = bookings.Select(b => b.ClientId).Distinct().ToList();
+            var carIds = bookings.Select(b => b.CarId).Distinct().ToList();
+
+            var clients = await _uow.Repository<Client>().FindAsync(c => clientIds.Contains(c.Id));
+            var cars = await _uow.Repository<Car>().FindAsync(c => carIds.Contains(c.Id));
+
+            var clientMap = clients.ToDictionary(c => c.Id, c => c);
+            var carMap = cars.ToDictionary(c => c.Id, c => c);
+
+            // items count
+            var items = await _uow.Repository<BookingItem>().FindAsync(i => bookingIds.Contains(i.BookingId));
+            var countMap = items.GroupBy(i => i.BookingId).ToDictionary(g => g.Key, g => g.Count());
+
+            // items by booking
+            var itemsByBooking = items
+                .GroupBy(i => i.BookingId)
+                .ToDictionary(g => g.Key, g => g.ToList());
+
+            // services names
+            var serviceIds = items.Select(i => i.ServiceId).Distinct().ToList();
+            var services = await _uow.Repository<Service>().FindAsync(s => serviceIds.Contains(s.Id));
+            var svcMap = services.ToDictionary(s => s.Id, s => s.Name);
+
+
+            DTOs.Bookings.BookingListItemDto Map(Booking b)
+            {
+                clientMap.TryGetValue(b.ClientId, out var cl);
+                carMap.TryGetValue(b.CarId, out var car);
+
+                itemsByBooking.TryGetValue(b.Id, out var bookingItems);
+                bookingItems ??= new List<BookingItem>();
+
+                var servicesLines = bookingItems.Select(i =>
+                {
+                    svcMap.TryGetValue(i.ServiceId, out var svcName);
+
+                    return new BookingServiceLineDto
+                    {
+                        BookingItemId = i.Id,
+                        ServiceId = i.ServiceId,
+                        ServiceName = svcName ?? "",
+                        UnitPrice = i.UnitPrice,
+                        DurationMinutes = i.DurationMinutes,
+                        Status = i.Status,
+                        AssignedEmployeeId = i.AssignedEmployeeId
+                    };
+                }).ToList();
+
+                return new DTOs.Bookings.BookingListItemDto
+                {
+                    BookingId = b.Id,
+                    ScheduledStart = b.ScheduledStart,
+                    Status = b.Status,
+                    ClientId = b.ClientId,
+                    ClientName = cl?.FullName ?? "",
+                    PhoneNumber = cl?.PhoneNumber ?? "",
+                    CarId = b.CarId,
+                    PlateNumber = car?.PlateNumber ?? "",
+                    TotalPrice = b.TotalPrice,
+                    ServicesCount = servicesLines.Count,
+                    Services = servicesLines
+                };
+            }
+
+            var resp = new TodayBookingsResponse { BranchId = branchId, Date = date };
+
+            foreach (var b in bookings.OrderBy(x => x.ScheduledStart))
+            {
+                var dto = Map(b);
+
+                switch (b.Status)
+                {
+                    case BookingStatus.Pending:
+                        resp.Pending.Add(dto);
+                        break;
+                    case BookingStatus.InProgress:
+                        resp.Active.Add(dto);
+                        break;
+                    case BookingStatus.Completed:
+                        resp.Completed.Add(dto);
+                        break;
+                    case BookingStatus.Cancelled:
+                        resp.Cancelled.Add(dto);
+                        break;
+                }
+            }
+
+            return resp;
+        }
 
 
 

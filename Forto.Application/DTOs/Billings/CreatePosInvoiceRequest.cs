@@ -21,8 +21,18 @@ namespace Forto.Application.DTOs.Billings
 
         public DateTime? OccurredAt { get; set; }
         public string? Notes { get; set; }
+
+        public PosCustomerDto? Customer { get; set; }   // ✅ new (optional)
+
     }
 
+
+
+    public class PosCustomerDto
+    {
+        public string? PhoneNumber { get; set; }
+        public string? FullName { get; set; }
+    }
 
 
 }

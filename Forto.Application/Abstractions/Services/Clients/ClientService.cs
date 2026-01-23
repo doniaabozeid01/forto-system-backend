@@ -53,11 +53,69 @@ namespace Forto.Application.Abstractions.Services.Clients
             return client == null ? null : Map(client);
         }
 
+        //public async Task<IReadOnlyList<ClientResponse>> GetAllAsync()
+        //{
+        //    var list = await _uow.Repository<Client>().GetAllAsync();
+        //    return list.Select(Map).ToList();
+        //}
+
+
+
+
+
         public async Task<IReadOnlyList<ClientResponse>> GetAllAsync()
         {
-            var list = await _uow.Repository<Client>().GetAllAsync();
-            return list.Select(Map).ToList();
+            var clientRepo = _uow.Repository<Client>();
+            var carRepo = _uow.Repository<Car>();
+
+            // 1) get all clients
+            var clients = await clientRepo.GetAllAsync();
+            if (clients.Count == 0)
+                return new List<ClientResponse>();
+
+            // 2) get all cars for those clients
+            var clientIds = clients.Select(c => c.Id).ToList();
+            var cars = await carRepo.FindAsync(c => clientIds.Contains(c.ClientId));
+
+            // 3) group cars by client
+            var carsByClient = cars
+                .GroupBy(c => c.ClientId)
+                .ToDictionary(g => g.Key, g => g.ToList());
+
+            // 4) map response
+            return clients.Select(c =>
+            {
+                carsByClient.TryGetValue(c.Id, out var clientCars);
+
+                var response = Map(c);
+                response.Cars = (clientCars ?? new List<Car>())
+                    .Select(MapClientCar)
+                    .ToList();
+
+
+                return response;
+            }).ToList();
         }
+
+
+        private static ClientCarResponse MapClientCar(Car c) => new ClientCarResponse
+        {
+            Id = c.Id,
+            PlateNumber = c.PlateNumber,
+            BodyType = c.BodyType,
+            IsDefault = c.IsDefault
+            // زوّدي أي حقول موجودة عندك في ClientCarResponse
+        };
+
+
+
+
+
+
+
+
+
+
 
         public async Task<ClientResponse?> UpdateAsync(int id, UpdateClientRequest request)
         {

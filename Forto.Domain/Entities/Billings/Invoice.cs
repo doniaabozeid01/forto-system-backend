@@ -1,4 +1,5 @@
 ﻿using Forto.Domain.Entities.Bookings;
+using Forto.Domain.Entities.Clients;
 using Forto.Domain.Entities.Ops;
 using Forto.Domain.Enum;
 using System;
@@ -26,6 +27,13 @@ namespace Forto.Domain.Entities.Billings
         public int? PaidByEmployeeId { get; set; }   // cashier employee id
         public DateTime? PaidAt { get; set; }
         public PaymentMethod? PaymentMethod { get; set; }
+
+        public int? ClientId { get; set; }          // nullable
+        public Client? Client { get; set; }         // optional navigation
+
+        public string? CustomerPhone { get; set; }  // snapshot
+        public string? CustomerName { get; set; }   // snapshot
+
 
         public ICollection<InvoiceLine> Lines { get; set; } = new List<InvoiceLine>();
     }

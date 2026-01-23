@@ -24,6 +24,11 @@ namespace Forto.Application.Abstractions.Services.Bookings
     DateOnly date,
     List<int> serviceIds
 );
+
+
+
+        Task<TodayBookingsResponse> GetTodayAsync(int branchId, DateOnly date);
+
         // Admin
         //Task CancelBookingItemAsync(int itemId, CashierActionRequest request);
         //Task CancelBookingAsync(int bookingId, CashierActionRequest request);

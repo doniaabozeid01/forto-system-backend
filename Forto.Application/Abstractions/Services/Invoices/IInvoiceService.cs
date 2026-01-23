@@ -28,6 +28,7 @@ namespace Forto.Application.Abstractions.Services.Invoices
 
         Task<InvoiceResponse> CreatePosInvoicePaidCashAsync(CreatePosInvoiceRequest request);
 
+        Task<InvoiceListResponse> ListAsync(InvoiceListQuery query);
 
     }
 }
