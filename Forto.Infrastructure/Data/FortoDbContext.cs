@@ -594,6 +594,33 @@ namespace Forto.Infrastructure.Data
     .OnDelete(DeleteBehavior.NoAction);
 
 
+
+
+            modelBuilder.Entity<BookingItemMaterialChangeRequest>()
+    .ToTable("BookingItemMaterialChangeRequests", "ops");
+
+            modelBuilder.Entity<BookingItemMaterialChangeRequest>()
+                .Property(x => x.Status)
+                .HasConversion<int>();
+
+            modelBuilder.Entity<BookingItemMaterialChangeRequest>()
+                .HasIndex(x => new { x.BookingItemId, x.Status }); // quick lookup
+
+            modelBuilder.Entity<BookingItemMaterialChangeRequestLine>()
+                .ToTable("BookingItemMaterialChangeRequestLines", "ops");
+
+            modelBuilder.Entity<BookingItemMaterialChangeRequestLine>()
+                .Property(x => x.ProposedActualQty)
+                .HasPrecision(18, 3);
+
+            modelBuilder.Entity<BookingItemMaterialChangeRequest>()
+                .HasMany(x => x.Lines)
+                .WithOne(x => x.Request)
+                .HasForeignKey(x => x.RequestId)
+                .OnDelete(DeleteBehavior.Cascade);
+
+
+
         }
 
         private static void SetSoftDeleteFilter<TEntity>(ModelBuilder builder) where TEntity : BaseEntity

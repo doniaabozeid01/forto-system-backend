@@ -1218,13 +1218,162 @@ namespace Forto.Application.Abstractions.Services.Bookings
 
 
 
-        public async Task<BookingItemResponse> CompleteItemAsync (int itemId, int employeeId)
+        //public async Task<BookingItemResponse> CompleteItemAsync (int itemId, int employeeId)
+        //{
+        //    var itemRepo = _uow.Repository<BookingItem>();
+        //    var bookingRepo = _uow.Repository<Booking>();
+        //    var usageRepo = _uow.Repository<BookingItemMaterialUsage>();
+        //    var stockRepo = _uow.Repository<BranchMaterialStock>();
+        //    var movementRepo = _uow.Repository<MaterialMovement>();
+
+        //    var item = await itemRepo.GetByIdAsync(itemId);
+        //    if (item == null) throw new BusinessException("Booking item not found", 404);
+
+        //    if (item.Status != BookingItemStatus.InProgress)
+        //        throw new BusinessException("Item cannot be completed in its current status", 409);
+
+        //    if (item.AssignedEmployeeId != employeeId)
+        //        throw new BusinessException("Only the assigned employee can complete this item", 403);
+
+        //    var booking = await bookingRepo.GetByIdAsync(item.BookingId);
+        //    if (booking == null) throw new BusinessException("Booking not found", 404);
+
+        //    var branchId = booking.BranchId;
+
+        //    // ✅ load usages tracking
+        //    var usages = await usageRepo.FindTrackingAsync(u => u.BookingItemId == item.Id);
+        //    if (usages.Count == 0)
+        //        throw new BusinessException("No reserved materials found for this item (start it first)", 409);
+
+        //    var materialIds = usages.Select(u => u.MaterialId).Distinct().ToList();
+
+        //    // ✅ load stocks tracking
+        //    var stocks = await stockRepo.FindTrackingAsync(s => s.BranchId == branchId && materialIds.Contains(s.MaterialId));
+        //    var stockMap = stocks.ToDictionary(s => s.MaterialId, s => s);
+
+        //    // ✅ Idempotency: لو movements اتسجلت قبل كده لنفس item/material -> متضيفهاش تاني
+        //    // (يحميك من retry / double request)
+        //    var existingConsume = await movementRepo.FindAsync(m =>
+        //        m.BookingItemId == item.Id &&
+        //        m.MovementType == MaterialMovementType.Consume);
+
+        //    var alreadyLogged = existingConsume
+        //        .Select(m => m.MaterialId)
+        //        .ToHashSet();
+
+        //    var occurredAt = DateTime.UtcNow;
+
+        //    // 1) final check + consume + release reserved + record movements
+        //    foreach (var u in usages)
+        //    {
+        //        if (!stockMap.TryGetValue(u.MaterialId, out var stock))
+        //            throw new BusinessException("Stock row missing for a material in this branch", 409);
+
+        //        // available if we release this item's reserved first:
+        //        var availableNow = stock.OnHandQty - stock.ReservedQty + u.ReservedQty;
+        //        if (availableNow < 0) availableNow = 0;
+
+        //        if (availableNow < u.ActualQty)
+        //        {
+        //            throw new BusinessException("Not enough stock to complete this service", 409,
+        //                new Dictionary<string, string[]>
+        //                {
+        //                    ["materials"] = new[]
+        //                    {
+        //                $"MaterialId={u.MaterialId}: need {u.ActualQty}, available {availableNow}"
+        //                    }
+        //                });
+        //        }
+
+        //        // ✅ release reservation in branch stock
+        //        stock.ReservedQty -= u.ReservedQty;
+        //        if (stock.ReservedQty < 0) stock.ReservedQty = 0;
+
+        //        // ✅ consume actual from onhand
+        //        stock.OnHandQty -= u.ActualQty;
+        //        if (stock.OnHandQty < 0) stock.OnHandQty = 0;
+
+        //        stockRepo.Update(stock);
+
+        //        // optional: mark reservation released at usage row level
+        //        u.ReservedQty = 0;
+        //        usageRepo.Update(u);
+
+        //        // ✅ record movement (CONSUME) once
+        //        if (!alreadyLogged.Contains(u.MaterialId) && u.ActualQty > 0)
+        //        {
+        //            await movementRepo.AddAsync(new MaterialMovement
+        //            {
+        //                BranchId = branchId,
+        //                MaterialId = u.MaterialId,
+        //                MovementType = MaterialMovementType.Consume,
+        //                Qty = u.ActualQty,
+        //                UnitCostSnapshot = u.UnitCost,
+        //                TotalCost = u.ActualQty * u.UnitCost,
+        //                OccurredAt = occurredAt,
+        //                BookingId = booking.Id,
+        //                BookingItemId = item.Id,
+        //                RecordedByEmployeeId = employeeId,
+        //                Notes = "Consume on complete"
+        //            });
+        //        }
+        //    }
+
+        //    // 2) compute total adjustment for this item (can be +/-)
+        //    var adjustment = usages.Sum(u => u.ExtraCharge);
+        //    item.MaterialAdjustment = adjustment;
+
+        //    // 3) set done
+        //    item.Status = BookingItemStatus.Done;
+        //    item.CompletedAt = occurredAt;
+        //    itemRepo.Update(item);
+
+        //    // 4) auto close booking (Completed/Cancelled)
+        //    await _closingService.TryAutoCloseBookingAsync(item.BookingId, save: false);
+
+        //    // ✅ ONE SAVE
+        //    try
+        //    {
+        //        await _uow.SaveChangesAsync();
+        //    }
+        //    catch (DbUpdateConcurrencyException)
+        //    {
+        //        throw new BusinessException("This record was modified by another operation. Please retry.", 409);
+        //    }
+
+        //    // بعد الحفظ: لو booking Completed -> ensure invoice
+        //    var freshBooking = await bookingRepo.GetByIdAsync(item.BookingId);
+        //    if (freshBooking != null && freshBooking.Status == BookingStatus.Completed)
+        //    {
+        //        await _invoiceService.EnsureInvoiceForBookingAsync(item.BookingId);
+        //    }
+
+        //    return MapItem(item);
+        //}
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+        public async Task<BookingItemResponse> CompleteItemAsync(int itemId, int employeeId)
         {
             var itemRepo = _uow.Repository<BookingItem>();
             var bookingRepo = _uow.Repository<Booking>();
             var usageRepo = _uow.Repository<BookingItemMaterialUsage>();
             var stockRepo = _uow.Repository<BranchMaterialStock>();
             var movementRepo = _uow.Repository<MaterialMovement>();
+            var reqRepo = _uow.Repository<BookingItemMaterialChangeRequest>();
 
             var item = await itemRepo.GetByIdAsync(itemId);
             if (item == null) throw new BusinessException("Booking item not found", 404);
@@ -1234,6 +1383,17 @@ namespace Forto.Application.Abstractions.Services.Bookings
 
             if (item.AssignedEmployeeId != employeeId)
                 throw new BusinessException("Only the assigned employee can complete this item", 403);
+
+            // ✅ block complete if there is a pending material change request
+            var hasPending = await reqRepo.AnyAsync(r =>
+                r.BookingItemId == itemId &&
+                r.Status == MaterialChangeRequestStatus.Pending);
+
+            if (hasPending)
+                throw new BusinessException(
+                    "Cannot complete this service while there is a pending material request. Please wait for cashier approval.",
+                    409
+                );
 
             var booking = await bookingRepo.GetByIdAsync(item.BookingId);
             if (booking == null) throw new BusinessException("Booking not found", 404);
@@ -1251,15 +1411,12 @@ namespace Forto.Application.Abstractions.Services.Bookings
             var stocks = await stockRepo.FindTrackingAsync(s => s.BranchId == branchId && materialIds.Contains(s.MaterialId));
             var stockMap = stocks.ToDictionary(s => s.MaterialId, s => s);
 
-            // ✅ Idempotency: لو movements اتسجلت قبل كده لنفس item/material -> متضيفهاش تاني
-            // (يحميك من retry / double request)
+            // ✅ Idempotency: prevent duplicate consume movements
             var existingConsume = await movementRepo.FindAsync(m =>
                 m.BookingItemId == item.Id &&
                 m.MovementType == MaterialMovementType.Consume);
 
-            var alreadyLogged = existingConsume
-                .Select(m => m.MaterialId)
-                .ToHashSet();
+            var alreadyLogged = existingConsume.Select(m => m.MaterialId).ToHashSet();
 
             var occurredAt = DateTime.UtcNow;
 
@@ -1285,21 +1442,21 @@ namespace Forto.Application.Abstractions.Services.Bookings
                         });
                 }
 
-                // ✅ release reservation in branch stock
+                // release reservation
                 stock.ReservedQty -= u.ReservedQty;
                 if (stock.ReservedQty < 0) stock.ReservedQty = 0;
 
-                // ✅ consume actual from onhand
+                // consume actual
                 stock.OnHandQty -= u.ActualQty;
                 if (stock.OnHandQty < 0) stock.OnHandQty = 0;
 
                 stockRepo.Update(stock);
 
-                // optional: mark reservation released at usage row level
+                // mark reservation released
                 u.ReservedQty = 0;
                 usageRepo.Update(u);
 
-                // ✅ record movement (CONSUME) once
+                // record consume movement once
                 if (!alreadyLogged.Contains(u.MaterialId) && u.ActualQty > 0)
                 {
                     await movementRepo.AddAsync(new MaterialMovement
@@ -1320,15 +1477,14 @@ namespace Forto.Application.Abstractions.Services.Bookings
             }
 
             // 2) compute total adjustment for this item (can be +/-)
-            var adjustment = usages.Sum(u => u.ExtraCharge);
-            item.MaterialAdjustment = adjustment;
+            item.MaterialAdjustment = usages.Sum(u => u.ExtraCharge);
 
             // 3) set done
             item.Status = BookingItemStatus.Done;
             item.CompletedAt = occurredAt;
             itemRepo.Update(item);
 
-            // 4) auto close booking (Completed/Cancelled)
+            // 4) auto close booking
             await _closingService.TryAutoCloseBookingAsync(item.BookingId, save: false);
 
             // ✅ ONE SAVE
@@ -1341,7 +1497,7 @@ namespace Forto.Application.Abstractions.Services.Bookings
                 throw new BusinessException("This record was modified by another operation. Please retry.", 409);
             }
 
-            // بعد الحفظ: لو booking Completed -> ensure invoice
+            // after save: if booking completed -> ensure invoice
             var freshBooking = await bookingRepo.GetByIdAsync(item.BookingId);
             if (freshBooking != null && freshBooking.Status == BookingStatus.Completed)
             {
@@ -1350,6 +1506,13 @@ namespace Forto.Application.Abstractions.Services.Bookings
 
             return MapItem(item);
         }
+
+
+
+
+
+
+
 
 
 

@@ -23,12 +23,12 @@ namespace Forto.Api.Controllers
 
 
 
-        [HttpPut("UpdateBookingItemMaterials")]
-        public async Task<IActionResult> Update(int bookingItemId, [FromBody] UpdateBookingItemMaterialsRequest request)
-        {
-            var data = await _service.UpdateActualAsync(bookingItemId, request);
-            return OkResponse(data, "Materials updated");
-        }
+        //[HttpPut("UpdateBookingItemMaterials")]
+        //public async Task<IActionResult> Update(int bookingItemId, [FromBody] UpdateBookingItemMaterialsRequest request)
+        //{
+        //    var data = await _service.UpdateActualAsync(bookingItemId, request);
+        //    return OkResponse(data, "Materials updated");
+        //}
     
     }
 
