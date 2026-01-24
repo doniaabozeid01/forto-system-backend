@@ -1,5 +1,6 @@
 ﻿using Forto.Application.Abstractions.Services.Employees;
 using Forto.Application.DTOs.Employees;
+using Forto.Domain.Entities.Catalog;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
@@ -68,6 +69,7 @@ namespace Forto.Api.Controllers
             var data = await _employeeService.CreateEmployeeUserAsync(req);
             return OkResponse(data, "Employee user created");
         }
+
 
 
 

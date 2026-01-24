@@ -15,5 +15,8 @@ namespace Forto.Application.Abstractions.Services.Inventory.Products
         Task<ProductResponse?> GetByIdAsync(int id);
         Task<ProductResponse?> UpdateAsync(int id, UpdateProductRequest request);
         Task<bool> DeleteAsync(int id);
+
+        Task<IReadOnlyList<ProductWithStockResponse>> GetAllWithStockAsync(int branchId);
+
     }
 }

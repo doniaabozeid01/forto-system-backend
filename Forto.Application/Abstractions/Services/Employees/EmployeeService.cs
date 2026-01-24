@@ -60,7 +60,7 @@ namespace Forto.Application.Abstractions.Services.Employees
         public async Task<EmployeeResponse> CreateEmployeeUserAsync(CreateEmployeeUserRequest req)
         {
             var role = req.Role.Trim().ToLowerInvariant();
-            var allowed = new[] { "washer", "cashier", "admin" };
+            var allowed = new[] { "worker", "cashier", "admin" };
             if (!allowed.Contains(role))
                 throw new BusinessException("Invalid role", 400);
 
@@ -83,7 +83,7 @@ namespace Forto.Application.Abstractions.Services.Employees
                 Age = req.Age,
                 PhoneNumber = phone,
                 IsActive = true,
-                Role = role == "washer" ? Domain.Enum.EmployeeRole.Worker :
+                Role = role == "worker" ? Domain.Enum.EmployeeRole.Worker :
                        role == "cashier" ? Domain.Enum.EmployeeRole.Cashier :
                        Domain.Enum.EmployeeRole.Admin
             };
@@ -172,7 +172,7 @@ namespace Forto.Application.Abstractions.Services.Employees
             var employee = await repo.GetByIdAsync(id);
             if (employee == null) return false;
 
-            repo.Delete(employee); // soft delete
+            repo.HardDelete(employee); // soft delete
             await _uow.SaveChangesAsync();
             return true;
         }

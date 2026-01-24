@@ -80,7 +80,7 @@ namespace Forto.Application.Abstractions.Services.Inventory.Materials
             var m = await repo.GetByIdAsync(id);
             if (m == null) return false;
 
-            repo.Delete(m); // soft delete
+            repo.HardDelete(m); // soft delete
             await _uow.SaveChangesAsync();
             return true;
         }

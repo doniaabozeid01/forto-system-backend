@@ -44,6 +44,16 @@ namespace Forto.Api.Controllers
             if (!ok) return FailResponse("Product not found", 404);
             return OkResponse(new { id }, "Product deleted");
         }
+
+
+
+        [HttpGet("with-stock")]
+        public async Task<IActionResult> GetAllWithStock([FromQuery] int branchId)
+        {
+            var data = await _service.GetAllWithStockAsync(branchId);
+            return OkResponse(data, "OK");
+        }
+
     }
 
 }

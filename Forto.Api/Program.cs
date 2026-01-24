@@ -171,9 +171,10 @@ namespace Forto.Api
             // ? CORS Policy
             builder.Services.AddCors(options =>
             {
-                options.AddPolicy("AllowBubbleOrigins", policy =>
+                options.AddPolicy("AllowFortoOrigins", policy =>
                     policy.WithOrigins(
-                            "http://localhost:4200"
+                            "http://localhost:4200",
+                            "https://fortolaundry.com"
                         )
                         .AllowAnyHeader()
                         .AllowAnyMethod()
@@ -205,7 +206,7 @@ namespace Forto.Api
 
 
             app.UseMiddleware<ExceptionHandlingMiddleware>();
-            app.UseCors("AllowBubbleOrigins");
+            app.UseCors("AllowFortoOrigins");
 
             await IdentitySeeder.SeedRolesAsync(app.Services);
 

@@ -7,6 +7,7 @@ using Forto.Api.Common;
 using Forto.Application.Abstractions.Repositories;
 using Forto.Application.DTOs.Inventory.Products;
 using Forto.Domain.Entities.Inventory;
+using Forto.Domain.Entities.Ops;
 
 namespace Forto.Application.Abstractions.Services.Inventory.Products
 {
@@ -45,6 +46,53 @@ namespace Forto.Application.Abstractions.Services.Inventory.Products
             var list = await _uow.Repository<Product>().GetAllAsync();
             return list.Select(Map).ToList();
         }
+        public async Task<IReadOnlyList<ProductWithStockResponse>> GetAllWithStockAsync(int branchId)
+        {
+            // validate branch
+            var branch = await _uow.Repository<Branch>().GetByIdAsync(branchId);
+            if (branch == null || !branch.IsActive)
+                throw new BusinessException("Branch not found", 404);
+
+            var productRepo = _uow.Repository<Product>();
+            var stockRepo = _uow.Repository<BranchProductStock>();
+
+            // 1) products
+            var products = await productRepo.GetAllAsync();
+            if (products.Count == 0)
+                return new List<ProductWithStockResponse>();
+
+            var productIds = products.Select(p => p.Id).ToList();
+
+            // 2) stock for that branch
+            var stocks = await stockRepo.FindAsync(s => s.BranchId == branchId && productIds.Contains(s.ProductId));
+            var stockMap = stocks.ToDictionary(s => s.ProductId, s => s);
+
+            // 3) merge
+            return products.Select(p =>
+            {
+                stockMap.TryGetValue(p.Id, out var st);
+
+                var onHand = st?.OnHandQty ?? 0m;
+                var reserved = st?.ReservedQty ?? 0m;
+                var available = onHand - reserved;
+                if (available < 0) available = 0;
+
+                return new ProductWithStockResponse
+                {
+                    Id = p.Id,
+                    Name = p.Name,
+                    Sku = p.Sku,
+                    SalePrice = p.SalePrice,
+                    CostPerUnit = p.CostPerUnit,
+                    IsActive = p.IsActive,
+
+                    OnHandQty = onHand,
+                    ReservedQty = reserved,
+                    AvailableQty = available,
+                    ReorderLevel = st?.ReorderLevel ?? 0m
+                };
+            }).ToList();
+        }
 
         public async Task<ProductResponse?> GetByIdAsync(int id)
         {
@@ -82,7 +130,7 @@ namespace Forto.Application.Abstractions.Services.Inventory.Products
             var p = await repo.GetByIdAsync(id);
             if (p == null) return false;
 
-            repo.Delete(p);
+            repo.HardDelete(p);
             await _uow.SaveChangesAsync();
             return true;
         }

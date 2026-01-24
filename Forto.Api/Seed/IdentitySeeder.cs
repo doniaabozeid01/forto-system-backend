@@ -10,7 +10,7 @@ namespace Forto.Api.Seed
             using var scope = sp.CreateScope();
             var roleManager = scope.ServiceProvider.GetRequiredService<RoleManager<ApplicationRole>>();
 
-            string[] roles = { "washer", "admin", "cashier", "client" };
+            string[] roles = { "washer", "admin", "cashier", "client", "worker" };
 
             foreach (var r in roles)
                 if (!await roleManager.RoleExistsAsync(r))
