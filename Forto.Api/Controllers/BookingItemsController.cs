@@ -21,23 +21,23 @@ namespace Forto.Api.Controllers
             _adminService = adminService;
         }
 
-        [HttpPut("{itemId:int}/start")]
-        public async Task<IActionResult> Start(int itemId, [FromBody] StartBookingItemRequest request)
-        {
-            var data = await _service.StartItemByCashierAsync(itemId, request.CashierId);
-            return OkResponse(data, "Item started");
-        }
+        //[HttpPut("{itemId:int}/start")]
+        //public async Task<IActionResult> Start(int itemId, [FromBody] StartBookingItemRequest request)
+        //{
+        //    var data = await _service.StartItemByCashierAsync(itemId, request.CashierId);
+        //    return OkResponse(data, "Item started");
+        //}
 
 
 
 
 
-        [HttpPut("{itemId:int}/complete")]
-        public async Task<IActionResult> Complete(int itemId, [FromBody] StartBookingItemRequest request)
-        {
-            var data = await _service.CompleteItemByCashierAsync(itemId, request.CashierId);
-            return OkResponse(data, "Item completed");
-        }
+        //[HttpPut("{itemId:int}/complete")]
+        //public async Task<IActionResult> Complete(int itemId, [FromBody] StartBookingItemRequest request)
+        //{
+        //    var data = await _service.CompleteItemByCashierAsync(itemId, request.CashierId);
+        //    return OkResponse(data, "Item completed");
+        //}
 
 
 

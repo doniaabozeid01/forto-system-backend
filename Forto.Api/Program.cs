@@ -6,6 +6,7 @@ using Forto.Api.Seed;
 using Forto.Application.Abstractions.Repositories;
 using Forto.Application.Abstractions.Services.Bookings;
 using Forto.Application.Abstractions.Services.Bookings.Admin;
+using Forto.Application.Abstractions.Services.Bookings.Cashier;
 using Forto.Application.Abstractions.Services.Bookings.Closing;
 using Forto.Application.Abstractions.Services.Cars;
 using Forto.Application.Abstractions.Services.Catalogs.Categories;
@@ -153,6 +154,11 @@ namespace Forto.Api
             builder.Services.AddScoped<IBranchProductStockService, BranchProductStockService>();
             builder.Services.AddScoped<IProductStockMovementService, ProductStockMovementService>();
             builder.Services.AddScoped<IDashboardService, DashboardService>();
+            builder.Services.AddScoped<IBookingLifecycleService, BookingLifecycleService>();
+            builder.Services.AddScoped<IBookingItemOpsService, BookingItemOpsService>();
+
+
+
 
 
 
