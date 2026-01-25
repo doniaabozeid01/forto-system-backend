@@ -2188,6 +2188,232 @@ namespace Forto.Application.Abstractions.Services.Invoices
         //}
 
 
+        //public async Task<InvoiceListResponse> ListAsync(InvoiceListQuery query)
+        //{
+        //    if (query.Page <= 0) query.Page = 1;
+        //    if (query.PageSize <= 0) query.PageSize = 20;
+
+        //    var branch = await _uow.Repository<Branch>().GetByIdAsync(query.BranchId);
+        //    if (branch == null || !branch.IsActive)
+        //        throw new BusinessException("Branch not found", 404);
+
+        //    var invRepo = _uow.Repository<Invoice>();
+        //    var lineRepo = _uow.Repository<InvoiceLine>();
+
+        //    // date range -> datetime range
+        //    DateTime? fromStart = null;
+        //    DateTime? toEnd = null;
+
+        //    if (!string.IsNullOrWhiteSpace(query.From))
+        //    {
+        //        if (!DateOnly.TryParse(query.From, out var fromDate))
+        //            throw new BusinessException("Invalid From date format. Use yyyy-MM-dd", 400);
+
+        //        fromStart = fromDate.ToDateTime(TimeOnly.MinValue);
+        //    }
+
+        //    if (!string.IsNullOrWhiteSpace(query.To))
+        //    {
+        //        if (!DateOnly.TryParse(query.To, out var toDate))
+        //            throw new BusinessException("Invalid To date format. Use yyyy-MM-dd", 400);
+
+        //        toEnd = toDate.AddDays(1).ToDateTime(TimeOnly.MinValue);
+        //    }
+
+        //    // 1) load invoices
+        //    var invoices = await invRepo.FindAsync(i =>
+        //        i.BranchId == query.BranchId &&
+        //        (fromStart == null || (i.PaidAt ?? i.CreatedAt) >= fromStart) &&
+        //        (toEnd == null || (i.PaidAt ?? i.CreatedAt) < toEnd) &&
+        //        (query.PaymentMethod == null || query.PaymentMethod == "all" ||
+        //            (query.PaymentMethod == "cash" && i.PaymentMethod == PaymentMethod.Cash))
+        //    );
+
+        //    // 2) search
+        //    if (!string.IsNullOrWhiteSpace(query.Q))
+        //    {
+        //        var q = query.Q.Trim();
+
+        //        if (int.TryParse(q, out var invId))
+        //        {
+        //            invoices = invoices.Where(i => i.Id == invId).ToList();
+        //        }
+        //        else
+        //        {
+        //            invoices = invoices.Where(i =>
+        //                (!string.IsNullOrWhiteSpace(i.CustomerPhone) && i.CustomerPhone.Contains(q)) ||
+        //                (!string.IsNullOrWhiteSpace(i.CustomerName) && i.CustomerName.Contains(q))
+        //            ).ToList();
+        //        }
+        //    }
+
+        //    invoices = invoices.OrderByDescending(i => i.PaidAt ?? i.CreatedAt).ToList();
+
+        //    var totalCount = invoices.Count;
+        //    var totalRevenue = invoices
+        //        .Where(i => i.Status == InvoiceStatus.Paid)
+        //        .Sum(i => i.Total);
+
+        //    // pagination
+        //    var skip = (query.Page - 1) * query.PageSize;
+        //    var pageInvoices = invoices.Skip(skip).Take(query.PageSize).ToList();
+
+        //    if (pageInvoices.Count == 0)
+        //    {
+        //        return new InvoiceListResponse
+        //        {
+        //            Summary = new InvoiceListSummary { TotalCount = totalCount, TotalRevenue = totalRevenue },
+        //            Items = new List<InvoiceListItemDto>(),
+        //            Page = query.Page,
+        //            PageSize = query.PageSize
+        //        };
+        //    }
+
+        //    // 3) load lines for this page
+        //    var invoiceIds = pageInvoices.Select(i => i.Id).ToList();
+        //    var lines = await lineRepo.FindAsync(l => invoiceIds.Contains(l.InvoiceId));
+
+        //    var linesByInvoice = lines
+        //        .GroupBy(l => l.InvoiceId)
+        //        .ToDictionary(g => g.Key, g => g.ToList());
+
+        //    // helper: full text
+        //    string BuildInvoiceContentText(List<InvoiceLine> invLines)
+        //    {
+        //        var texts = invLines
+        //            .Select(l => (l.Description ?? "").Trim())
+        //            .Where(d => !string.IsNullOrWhiteSpace(d))
+        //            .Distinct()
+        //            .ToList();
+
+        //        return string.Join(", ", texts);
+        //    }
+
+
+        //    var clientRepo = _uow.Repository<Client>();
+        //    var bookingRepo = _uow.Repository<Booking>();
+
+        //    // collect needed client ids
+        //    var clientIds = new HashSet<int>();
+
+        //    foreach (var inv in pageInvoices)
+        //    {
+        //        if (inv.ClientId.HasValue)
+        //            clientIds.Add(inv.ClientId.Value);
+        //    }
+
+        //    // for booking invoices, use booking.ClientId if invoice client is null
+        //    var bookingIds = pageInvoices.Where(i => i.BookingId.HasValue).Select(i => i.BookingId!.Value).Distinct().ToList();
+        //    if (bookingIds.Count > 0)
+        //    {
+        //        var bookings = await bookingRepo.FindAsync(b => bookingIds.Contains(b.Id));
+        //        foreach (var b in bookings)
+        //            clientIds.Add(b.ClientId);
+        //    }
+
+        //    // load clients
+        //    var clients = clientIds.Count == 0
+        //        ? new List<Client>()
+        //        : await clientRepo.FindAsync(c => clientIds.Contains(c.Id));
+
+        //    var clientMap = clients.ToDictionary(c => c.Id, c => c);
+        //    var bookingClientMap = new Dictionary<int, int>(); // bookingId -> clientId
+        //    if (bookingIds.Count > 0)
+        //    {
+        //        var bookings = await bookingRepo.FindAsync(b => bookingIds.Contains(b.Id));
+        //        bookingClientMap = bookings.ToDictionary(b => b.Id, b => b.ClientId);
+        //    }
+
+
+
+
+
+
+
+
+
+
+        //    var items = pageInvoices.Select(inv =>
+        //    {
+        //        linesByInvoice.TryGetValue(inv.Id, out var invLines);
+        //        invLines ??= new List<InvoiceLine>();
+
+        //        var lineDtos = invLines
+        //            .OrderBy(l => l.Id)
+        //            .Select(l => new InvoiceLineListDto
+        //            {
+        //                LineId = l.Id,
+        //                Description = l.Description ?? "",
+        //                Qty = l.Qty,
+        //                UnitPrice = l.UnitPrice,
+        //                Total = l.Total
+        //            })
+        //            .ToList();
+
+        //        var itemsText = string.Join(", ",
+        //            lineDtos.Select(x => x.Description)
+        //                    .Where(d => !string.IsNullOrWhiteSpace(d))
+        //                    .Distinct()
+        //        );
+
+        //        return new InvoiceListItemDto
+        //        {
+        //            InvoiceId = inv.Id,
+        //            Date = inv.PaidAt ?? inv.CreatedAt,
+        //            InvoiceNumber = inv.InvoiceNumber,
+
+        //            PaymentMethod = inv.PaymentMethod ?? PaymentMethod.Cash,
+        //            SubTotal = inv.SubTotal,
+        //            Discount = inv.Discount,
+        //            Total = inv.Total,
+
+        //            CustomerName = inv.CustomerName ?? "",
+        //            CustomerPhone = inv.CustomerPhone ?? "",
+
+        //            // if you still want a simple string:
+        //            //Services = BuildInvoiceContentText(invLines),
+
+        //            ItemsText = itemsText,
+        //            Lines = lineDtos
+        //        };
+        //    }).ToList();
+
+        //    return new InvoiceListResponse
+        //    {
+        //        Summary = new InvoiceListSummary
+        //        {
+        //            TotalCount = totalCount,
+        //            TotalRevenue = totalRevenue
+        //        },
+        //        Items = items,
+        //        Page = query.Page,
+        //        PageSize = query.PageSize
+        //    };
+        //}
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
         public async Task<InvoiceListResponse> ListAsync(InvoiceListQuery query)
         {
             if (query.Page <= 0) query.Page = 1;
@@ -2199,6 +2425,8 @@ namespace Forto.Application.Abstractions.Services.Invoices
 
             var invRepo = _uow.Repository<Invoice>();
             var lineRepo = _uow.Repository<InvoiceLine>();
+            var clientRepo = _uow.Repository<Client>();
+            var bookingRepo = _uow.Repository<Booking>();
 
             // date range -> datetime range
             DateTime? fromStart = null;
@@ -2240,6 +2468,7 @@ namespace Forto.Application.Abstractions.Services.Invoices
                 }
                 else
                 {
+                    // search on snapshot fields only (MVP)
                     invoices = invoices.Where(i =>
                         (!string.IsNullOrWhiteSpace(i.CustomerPhone) && i.CustomerPhone.Contains(q)) ||
                         (!string.IsNullOrWhiteSpace(i.CustomerName) && i.CustomerName.Contains(q))
@@ -2272,23 +2501,40 @@ namespace Forto.Application.Abstractions.Services.Invoices
             // 3) load lines for this page
             var invoiceIds = pageInvoices.Select(i => i.Id).ToList();
             var lines = await lineRepo.FindAsync(l => invoiceIds.Contains(l.InvoiceId));
+            var linesByInvoice = lines.GroupBy(l => l.InvoiceId).ToDictionary(g => g.Key, g => g.ToList());
 
-            var linesByInvoice = lines
-                .GroupBy(l => l.InvoiceId)
-                .ToDictionary(g => g.Key, g => g.ToList());
+            // 4) Build client fallback maps (ClientId from invoice OR booking)
+            var bookingIds = pageInvoices
+                .Where(i => i.BookingId.HasValue)
+                .Select(i => i.BookingId!.Value)
+                .Distinct()
+                .ToList();
 
-            // helper: full text
-            string BuildInvoiceContentText(List<InvoiceLine> invLines)
+            var bookingClientMap = new Dictionary<int, int>();
+            if (bookingIds.Count > 0)
             {
-                var texts = invLines
-                    .Select(l => (l.Description ?? "").Trim())
-                    .Where(d => !string.IsNullOrWhiteSpace(d))
-                    .Distinct()
-                    .ToList();
-
-                return string.Join(", ", texts);
+                var bookings = await bookingRepo.FindAsync(b => bookingIds.Contains(b.Id));
+                bookingClientMap = bookings.ToDictionary(b => b.Id, b => b.ClientId);
             }
 
+            var clientIds = new HashSet<int>();
+
+            foreach (var inv in pageInvoices)
+            {
+                if (inv.ClientId.HasValue)
+                    clientIds.Add(inv.ClientId.Value);
+
+                if (!inv.ClientId.HasValue && inv.BookingId.HasValue && bookingClientMap.TryGetValue(inv.BookingId.Value, out var bc))
+                    clientIds.Add(bc);
+            }
+
+            var clients = clientIds.Count == 0
+                ? new List<Client>()
+                : await clientRepo.FindAsync(c => clientIds.Contains(c.Id));
+
+            var clientMap = clients.ToDictionary(c => c.Id, c => c);
+
+            // 5) map items
             var items = pageInvoices.Select(inv =>
             {
                 linesByInvoice.TryGetValue(inv.Id, out var invLines);
@@ -2312,22 +2558,40 @@ namespace Forto.Application.Abstractions.Services.Invoices
                             .Distinct()
                 );
 
+                // ✅ customer fallback
+                var customerName = inv.CustomerName ?? "";
+                var customerPhone = inv.CustomerPhone ?? "";
+
+                if (string.IsNullOrWhiteSpace(customerName) && string.IsNullOrWhiteSpace(customerPhone))
+                {
+                    int? cid = inv.ClientId;
+
+                    if (!cid.HasValue && inv.BookingId.HasValue && bookingClientMap.TryGetValue(inv.BookingId.Value, out var bc))
+                        cid = bc;
+
+                    if (cid.HasValue && clientMap.TryGetValue(cid.Value, out var cl))
+                    {
+                        customerName = cl.FullName ?? "";
+                        customerPhone = cl.PhoneNumber ?? "";
+                    }
+                }
+
+                if (string.IsNullOrWhiteSpace(customerName))
+                    customerName = "Walk-in";
+
                 return new InvoiceListItemDto
                 {
                     InvoiceId = inv.Id,
                     Date = inv.PaidAt ?? inv.CreatedAt,
                     InvoiceNumber = inv.InvoiceNumber,
-                    
+
                     PaymentMethod = inv.PaymentMethod ?? PaymentMethod.Cash,
                     SubTotal = inv.SubTotal,
                     Discount = inv.Discount,
                     Total = inv.Total,
 
-                    CustomerName = inv.CustomerName ?? "",
-                    CustomerPhone = inv.CustomerPhone ?? "",
-
-                    // if you still want a simple string:
-                    //Services = BuildInvoiceContentText(invLines),
+                    CustomerName = customerName,
+                    CustomerPhone = customerPhone,
 
                     ItemsText = itemsText,
                     Lines = lineDtos
@@ -2346,6 +2610,9 @@ namespace Forto.Application.Abstractions.Services.Invoices
                 PageSize = query.PageSize
             };
         }
+
+
+
 
 
 
