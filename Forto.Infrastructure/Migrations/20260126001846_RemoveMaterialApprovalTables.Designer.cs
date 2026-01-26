@@ -4,6 +4,7 @@ using Forto.Infrastructure.Data;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Infrastructure;
 using Microsoft.EntityFrameworkCore.Metadata;
+using Microsoft.EntityFrameworkCore.Migrations;
 using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 
 #nullable disable
@@ -11,9 +12,11 @@ using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 namespace Forto.Infrastructure.Migrations
 {
     [DbContext(typeof(FortoDbContext))]
-    partial class FortoDbContextModelSnapshot : ModelSnapshot
+    [Migration("20260126001846_RemoveMaterialApprovalTables")]
+    partial class RemoveMaterialApprovalTables
     {
-        protected override void BuildModel(ModelBuilder modelBuilder)
+        /// <inheritdoc />
+        protected override void BuildTargetModel(ModelBuilder modelBuilder)
         {
 #pragma warning disable 612, 618
             modelBuilder
@@ -51,10 +54,6 @@ namespace Forto.Infrastructure.Migrations
                     b.Property<decimal>("Discount")
                         .HasColumnType("decimal(18,2)");
 
-                    b.Property<string>("InvoiceNumber")
-                        .IsRequired()
-                        .HasColumnType("nvarchar(max)");
-
                     b.Property<bool>("IsDeleted")
                         .HasColumnType("bit");
 
@@ -71,12 +70,6 @@ namespace Forto.Infrastructure.Migrations
                         .HasColumnType("int");
 
                     b.Property<decimal>("SubTotal")
-                        .HasColumnType("decimal(18,2)");
-
-                    b.Property<decimal>("TaxAmount")
-                        .HasColumnType("decimal(18,2)");
-
-                    b.Property<decimal>("TaxRate")
                         .HasColumnType("decimal(18,2)");
 
                     b.Property<decimal>("Total")

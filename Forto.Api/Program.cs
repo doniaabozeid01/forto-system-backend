@@ -10,7 +10,6 @@ using Forto.Application.Abstractions.Services.Bookings.Closing;
 using Forto.Application.Abstractions.Services.Cars;
 using Forto.Application.Abstractions.Services.Catalogs.Categories;
 using Forto.Application.Abstractions.Services.Catalogs.Recipes;
-using Forto.Application.Abstractions.Services.Catalogs.Recipes.MaterialApprove;
 using Forto.Application.Abstractions.Services.Catalogs.Service;
 using Forto.Application.Abstractions.Services.Clients;
 using Forto.Application.Abstractions.Services.Dashboard;
@@ -154,7 +153,6 @@ namespace Forto.Api
             builder.Services.AddScoped<IBranchProductStockService, BranchProductStockService>();
             builder.Services.AddScoped<IProductStockMovementService, ProductStockMovementService>();
             builder.Services.AddScoped<IDashboardService, DashboardService>();
-            builder.Services.AddScoped<IMaterialApprovalService, MaterialApprovalService>();
 
 
 

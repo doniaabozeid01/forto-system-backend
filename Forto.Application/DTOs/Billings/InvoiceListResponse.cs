@@ -25,7 +25,9 @@ namespace Forto.Application.DTOs.Billings
 public class InvoiceListItemDto
 {
     public int InvoiceId { get; set; }
-    public DateTime Date { get; set; }
+        public string InvoiceNumber { get; set; } = "";
+
+        public DateTime Date { get; set; }
 
     public PaymentMethod? PaymentMethod { get; set; }
     public decimal SubTotal { get; set; }

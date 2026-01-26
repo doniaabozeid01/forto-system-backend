@@ -10,6 +10,8 @@ namespace Forto.Application.DTOs.Billings
     public class InvoiceResponse
     {
         public int Id { get; set; }
+        public string InvoiceNumber { get; set; } = "";
+
         public int BookingId { get; set; }
 
         public decimal SubTotal { get; set; }

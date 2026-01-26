@@ -12,6 +12,8 @@ namespace Forto.Domain.Entities.Billings
 {
     public class Invoice : BaseEntity
     {
+        public string InvoiceNumber { get; set; } = null!;
+
         public int? BookingId { get; set; }
         public Booking? Booking { get; set; } = null!;
 
@@ -33,6 +35,9 @@ namespace Forto.Domain.Entities.Billings
 
         public string? CustomerPhone { get; set; }  // snapshot
         public string? CustomerName { get; set; }   // snapshot
+
+        public decimal TaxRate { get; set; } = 0.14m; // 14%
+        public decimal TaxAmount { get; set; }       // محسوبة
 
 
         public ICollection<InvoiceLine> Lines { get; set; } = new List<InvoiceLine>();

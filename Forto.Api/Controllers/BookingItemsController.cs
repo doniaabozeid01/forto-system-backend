@@ -2,6 +2,7 @@
 using Forto.Application.Abstractions.Services.Bookings.Admin;
 using Forto.Application.DTOs.Billings;
 using Forto.Application.DTOs.Bookings;
+using Forto.Application.DTOs.Inventory.Materials;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
 
@@ -23,15 +24,18 @@ namespace Forto.Api.Controllers
         [HttpPut("{itemId:int}/start")]
         public async Task<IActionResult> Start(int itemId, [FromBody] StartBookingItemRequest request)
         {
-            var data = await _service.StartItemAsync(itemId, request.EmployeeId);
+            var data = await _service.StartItemByCashierAsync(itemId, request.CashierId);
             return OkResponse(data, "Item started");
         }
+
+
+
 
 
         [HttpPut("{itemId:int}/complete")]
         public async Task<IActionResult> Complete(int itemId, [FromBody] StartBookingItemRequest request)
         {
-            var data = await _service.CompleteItemAsync(itemId, request.EmployeeId);
+            var data = await _service.CompleteItemByCashierAsync(itemId, request.CashierId);
             return OkResponse(data, "Item completed");
         }
 
@@ -39,7 +43,14 @@ namespace Forto.Api.Controllers
 
 
 
-
+        [HttpPut("{bookingItemId:int}/materials/by-cashier")]
+        public async Task<IActionResult> UpdateMaterialsByCashier(
+    int bookingItemId,
+    [FromBody] UpdateBookingItemMaterialsByCashierRequest request)
+        {
+            var data = await _service.UpdateActualByCashierAsync(bookingItemId, request);
+            return OkResponse(data, "Materials updated");
+        }
 
 
 

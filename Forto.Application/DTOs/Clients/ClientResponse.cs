@@ -28,6 +28,10 @@ namespace Forto.Application.DTOs.Clients
         public int Id { get; set; }
         public string PlateNumber { get; set; } = "";
         public CarBodyType BodyType { get; set; }
+        public string? Brand { get; set; }
+        public string? Model { get; set; }
+        public string? Color { get; set; }
+        public int? Year { get; set; }
         // أو أحيانًا int
         public bool IsDefault { get; set; }
     }

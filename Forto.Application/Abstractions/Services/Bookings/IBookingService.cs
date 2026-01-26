@@ -1,5 +1,7 @@
 ﻿using Forto.Application.DTOs.Billings;
 using Forto.Application.DTOs.Bookings;
+using Forto.Application.DTOs.Inventory.Materials;
+using Forto.Application.DTOs.Ops.Usage;
 using System;
 using System.Collections.Generic;
 using System.Linq;
@@ -15,8 +17,8 @@ namespace Forto.Application.Abstractions.Services.Bookings
         Task<BookingResponse> CreateAsync(CreateBookingRequest request);
         Task<BookingResponse?> GetByIdAsync(int bookingId);
 
-        Task<BookingItemResponse> StartItemAsync(int itemId, int employeeId);
-        Task<BookingItemResponse> CompleteItemAsync(int itemId, int employeeId);
+        //Task<BookingItemResponse> StartItemAsync(int itemId, int employeeId);
+        //Task<BookingItemResponse> CompleteItemAsync(int itemId, int employeeId);
 
         Task<BookingResponse> QuickCreateAsync(QuickCreateBookingRequest request);
         Task<AvailableSlotsResponse> GetAvailableSlotsAsync(
@@ -25,6 +27,9 @@ namespace Forto.Application.Abstractions.Services.Bookings
     List<int> serviceIds
 );
 
+        Task<BookingItemResponse> StartItemByCashierAsync(int itemId, int cashierId);
+        Task<BookingItemResponse> CompleteItemByCashierAsync(int itemId, int cashierId);
+        Task<BookingItemMaterialsResponse> UpdateActualByCashierAsync(int bookingItemId, UpdateBookingItemMaterialsByCashierRequest request);
 
 
         Task<TodayBookingsResponse> GetTodayAsync(int branchId, DateOnly date);

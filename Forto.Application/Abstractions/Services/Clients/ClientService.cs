@@ -92,7 +92,6 @@ namespace Forto.Application.Abstractions.Services.Clients
                     .Select(MapClientCar)
                     .ToList();
 
-
                 return response;
             }).ToList();
         }
@@ -103,7 +102,11 @@ namespace Forto.Application.Abstractions.Services.Clients
             Id = c.Id,
             PlateNumber = c.PlateNumber,
             BodyType = c.BodyType,
-            IsDefault = c.IsDefault
+            IsDefault = c.IsDefault,
+            Brand = c.Brand,
+            Color = c.Color,
+            Model = c.Model,
+            Year = c.Year
             // زوّدي أي حقول موجودة عندك في ClientCarResponse
         };
 

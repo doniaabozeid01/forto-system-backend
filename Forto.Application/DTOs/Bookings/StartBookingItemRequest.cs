@@ -10,6 +10,6 @@ namespace Forto.Application.DTOs.Bookings
     public class StartBookingItemRequest
     {
         [Required]
-        public int EmployeeId { get; set; }
+        public int CashierId { get; set; }
     }
 }
