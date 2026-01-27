@@ -112,9 +112,8 @@ namespace Forto.Api.Controllers
 
 
 
-
         [HttpGet("{bookingId:int}/services/options")]
-        public async Task<IActionResult> GetServiceOptions(int bookingId)
+        public async Task<IActionResult> GetServiceOptions (int bookingId)
         {
             var data = await _service.GetServiceOptionsAsync(bookingId);
             return OkResponse(data, "OK");
@@ -123,5 +122,4 @@ namespace Forto.Api.Controllers
 
 
     }
-
 }

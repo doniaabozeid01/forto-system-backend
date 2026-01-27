@@ -1,5 +1,7 @@
 ﻿using Forto.Api.Common;
+using Microsoft.Data.SqlClient;
 using Microsoft.EntityFrameworkCore;
+using System.Diagnostics;
 using System.Net;
 using System.Text.Json;
 
@@ -51,6 +53,18 @@ namespace Forto.Api.Middleware
                 await context.Response.WriteAsync(JsonSerializer.Serialize(payload));
                 return;
             }
+            catch (DbUpdateException ex) when(ex.InnerException is SqlException sqlEx && sqlEx.Number == 2601)
+            {
+                var traceId = context.TraceIdentifier;
+
+                var payload = ApiResponse<object>.Fail(
+                    message: "This booking was already started (materials already reserved).",
+                errors: null,
+                traceId: traceId
+                );
+                await context.Response.WriteAsync(JsonSerializer.Serialize(payload));
+            }
+
             catch (Exception ex)
             {
                 var traceId = context.TraceIdentifier;

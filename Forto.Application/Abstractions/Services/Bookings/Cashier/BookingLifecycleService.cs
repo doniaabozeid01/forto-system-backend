@@ -29,6 +29,60 @@ namespace Forto.Application.Abstractions.Services.Bookings.Cashier
             _bookingService = bookingService;
         }
 
+        //public async Task<BookingResponse> StartBookingAsync(int bookingId, int cashierId)
+        //{
+        //    await RequireCashierAsync(cashierId);
+
+        //    var bookingRepo = _uow.Repository<Booking>();
+        //    var itemRepo = _uow.Repository<BookingItem>();
+
+        //    var booking = await bookingRepo.GetByIdAsync(bookingId);
+        //    if (booking == null) throw new BusinessException("Booking not found", 404);
+
+        //    if (booking.Status != BookingStatus.Pending)
+        //        throw new BusinessException("Booking cannot be started in its current status", 409);
+
+        //    var items = await itemRepo.FindTrackingAsync(i => i.BookingId == bookingId && i.Status != BookingItemStatus.Cancelled);
+        //    if (items.Count == 0) throw new BusinessException("No services to start", 409);
+
+        //    // require each item assigned to employee (you wanted to know who works)
+        //    if (items.Any(i => i.AssignedEmployeeId == null))
+        //        throw new BusinessException("All services must be assigned to an employee before starting the booking", 409);
+
+        //    // reserve materials for all items
+        //    foreach (var item in items)
+        //    {
+        //        await ReserveMaterialsForItemAsync(booking, item, cashierId);
+        //        item.Status = BookingItemStatus.InProgress;
+        //        item.StartedAt = DateTime.UtcNow;
+        //        itemRepo.Update(item);
+        //    }
+
+        //    booking.Status = BookingStatus.InProgress;
+        //    bookingRepo.Update(booking);
+
+        //    await _uow.SaveChangesAsync();
+
+        //    // return fresh
+        //    var refreshed = await _bookingService.GetByIdAsync(bookingId);
+        //    return refreshed ?? throw new BusinessException("Booking not found", 404);
+        //}
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
         public async Task<BookingResponse> StartBookingAsync(int bookingId, int cashierId)
         {
             await RequireCashierAsync(cashierId);
@@ -39,34 +93,73 @@ namespace Forto.Application.Abstractions.Services.Bookings.Cashier
             var booking = await bookingRepo.GetByIdAsync(bookingId);
             if (booking == null) throw new BusinessException("Booking not found", 404);
 
-            if (booking.Status != BookingStatus.Pending)
-                throw new BusinessException("Booking cannot be started in its current status", 409);
+            // ✅ بدل ما نمنع تمامًا، نخليها safe:
+            if (booking.Status == BookingStatus.Cancelled || booking.Status == BookingStatus.Completed)
+                throw new BusinessException("Booking is closed and cannot be started", 409);
 
             var items = await itemRepo.FindTrackingAsync(i => i.BookingId == bookingId && i.Status != BookingItemStatus.Cancelled);
             if (items.Count == 0) throw new BusinessException("No services to start", 409);
 
-            // require each item assigned to employee (you wanted to know who works)
             if (items.Any(i => i.AssignedEmployeeId == null))
                 throw new BusinessException("All services must be assigned to an employee before starting the booking", 409);
 
-            // reserve materials for all items
-            foreach (var item in items)
+            // ✅ start only pending items
+            var toStart = items.Where(i => i.Status == BookingItemStatus.Pending).ToList();
+
+            // لو مفيش pending items:
+            // - لو booking already InProgress يبقى OK
+            // - لو booking Pending لكن items مش pending (غريب) نرجع خطأ
+            if (toStart.Count == 0)
+            {
+                if (booking.Status == BookingStatus.InProgress)
+                {
+                    var already = await _bookingService.GetByIdAsync(bookingId);
+                    return already ?? throw new BusinessException("Booking not found", 404);
+                }
+
+                // booking pending but nothing to start -> data inconsistency
+                throw new BusinessException("No pending services to start", 409);
+            }
+
+            foreach (var item in toStart)
             {
                 await ReserveMaterialsForItemAsync(booking, item, cashierId);
+
                 item.Status = BookingItemStatus.InProgress;
                 item.StartedAt = DateTime.UtcNow;
                 itemRepo.Update(item);
             }
 
-            booking.Status = BookingStatus.InProgress;
-            bookingRepo.Update(booking);
+            // ✅ set booking InProgress if it was Pending
+            if (booking.Status == BookingStatus.Pending)
+            {
+                booking.Status = BookingStatus.InProgress;
+                bookingRepo.Update(booking);
+            }
 
             await _uow.SaveChangesAsync();
 
-            // return fresh
             var refreshed = await _bookingService.GetByIdAsync(bookingId);
             return refreshed ?? throw new BusinessException("Booking not found", 404);
         }
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 
         public async Task<BookingResponse> CompleteBookingAsync(int bookingId, int cashierId)
         {
@@ -177,12 +270,90 @@ namespace Forto.Application.Abstractions.Services.Bookings.Cashier
         }
 
         // --------- Reservation helper (same logic as StartItem but reused) ----------
+        //private async Task ReserveMaterialsForItemAsync(Booking booking, BookingItem item, int cashierId)
+        //{
+        //    var recipeRepo = _uow.Repository<ServiceMaterialRecipe>();
+        //    var materialRepo = _uow.Repository<Material>();
+        //    var stockRepo = _uow.Repository<BranchMaterialStock>();
+        //    var usageRepo = _uow.Repository<BookingItemMaterialUsage>();
+
+        //    var recipeRows = await recipeRepo.FindAsync(r =>
+        //        r.IsActive && r.ServiceId == item.ServiceId && r.BodyType == item.BodyType);
+
+        //    if (recipeRows.Count == 0)
+        //        throw new BusinessException("Missing recipe for this service and car type", 409);
+
+        //    var materialIds = recipeRows.Select(r => r.MaterialId).Distinct().ToList();
+        //    var mats = await materialRepo.FindAsync(m => materialIds.Contains(m.Id) && m.IsActive);
+        //    var matMap = mats.ToDictionary(m => m.Id, m => m);
+
+        //    var stocks = await stockRepo.FindTrackingAsync(s => s.BranchId == booking.BranchId && materialIds.Contains(s.MaterialId));
+        //    var stockMap = stocks.ToDictionary(s => s.MaterialId, s => s);
+
+        //    // check availability first
+        //    foreach (var row in recipeRows)
+        //    {
+        //        if (!stockMap.TryGetValue(row.MaterialId, out var stock))
+        //            throw new BusinessException("Stock row missing for material in this branch", 409);
+
+        //        var available = stock.OnHandQty - stock.ReservedQty;
+        //        if (available < 0) available = 0;
+
+        //        if (available < row.DefaultQty)
+        //            throw new BusinessException("Not enough stock to start booking", 409);
+        //    }
+
+        //    // reserve + usage
+        //    foreach (var row in recipeRows)
+        //    {
+        //        var stock = stockMap[row.MaterialId];
+        //        stock.ReservedQty += row.DefaultQty;
+        //        stockRepo.Update(stock);
+
+        //        var mat = matMap[row.MaterialId];
+
+        //        await usageRepo.AddAsync(new BookingItemMaterialUsage
+        //        {
+        //            BookingItemId = item.Id,
+        //            MaterialId = row.MaterialId,
+        //            DefaultQty = row.DefaultQty,
+        //            ReservedQty = row.DefaultQty,
+        //            ActualQty = row.DefaultQty,
+        //            UnitCost = mat.CostPerUnit,
+        //            UnitCharge = mat.ChargePerUnit,
+        //            ExtraCharge = 0,
+        //            RecordedByEmployeeId = cashierId,
+        //            RecordedAt = DateTime.UtcNow
+        //        });
+        //    }
+        //}
+
+
+
+
+
+
+
+
+
+
+
+
         private async Task ReserveMaterialsForItemAsync(Booking booking, BookingItem item, int cashierId)
         {
             var recipeRepo = _uow.Repository<ServiceMaterialRecipe>();
             var materialRepo = _uow.Repository<Material>();
             var stockRepo = _uow.Repository<BranchMaterialStock>();
             var usageRepo = _uow.Repository<BookingItemMaterialUsage>();
+
+            // ✅ IMPORTANT: idempotency guard
+            // لو usages موجودة بالفعل لنفس bookingItem -> متعملش insert تاني
+            var existingUsages = await usageRepo.FindAsync(u => u.BookingItemId == item.Id);
+            if (existingUsages.Count > 0)
+            {
+                // already reserved/created before
+                return;
+            }
 
             var recipeRows = await recipeRepo.FindAsync(r =>
                 r.IsActive && r.ServiceId == item.ServiceId && r.BodyType == item.BodyType);
@@ -213,7 +384,9 @@ namespace Forto.Application.Abstractions.Services.Bookings.Cashier
             // reserve + usage
             foreach (var row in recipeRows)
             {
-                var stock = stockMap[row.MaterialId];
+                if (!stockMap.TryGetValue(row.MaterialId, out var stock))
+                    throw new BusinessException("Stock row missing for material in this branch", 409);
+
                 stock.ReservedQty += row.DefaultQty;
                 stockRepo.Update(stock);
 
@@ -234,6 +407,19 @@ namespace Forto.Application.Abstractions.Services.Bookings.Cashier
                 });
             }
         }
+
+
+
+
+
+
+
+
+
+
+
+
+
 
 
         private async Task RequireCashierAsync(int cashierId)

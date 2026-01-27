@@ -17,7 +17,7 @@ namespace Forto.Api.Controllers
         }
 
         [HttpPost("checkout")]
-        public async Task<IActionResult> Checkout([FromBody] CashierCheckoutRequest request)
+        public async Task<IActionResult> Checkout ([FromBody] CashierCheckoutRequest request)
         {
             var data = await _service.CheckoutNowAsync(request);
             return OkResponse(data, "Checkout completed");

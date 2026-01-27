@@ -2,8 +2,11 @@
 using Forto.Application.Abstractions.Repositories;
 using Forto.Application.DTOs.Catalog.Services;
 using Forto.Application.DTOs.Employees;
+using Forto.Domain.Entities.Bookings;
 using Forto.Domain.Entities.Catalog;
 using Forto.Domain.Entities.Employees;
+using Forto.Domain.Entities.Ops;
+using Forto.Domain.Enum;
 using System;
 using System.Collections.Generic;
 using System.Linq;
@@ -196,5 +199,268 @@ namespace Forto.Application.Abstractions.Services.Catalogs.Service
                 })
                 .ToList();
         }
+
+
+
+
+
+        //public async Task<IReadOnlyList<EmployeeResponse>> GetEmployeesForServiceAtAsync(
+        //int serviceId,
+        //DateTime scheduledStart,
+        //int branchId)
+        //{
+        //    // 0) validate inputs
+        //    var branch = await _uow.Repository<Branch>().GetByIdAsync(branchId);
+        //    if (branch == null || !branch.IsActive)
+        //        throw new BusinessException("Branch not found", 404);
+
+        //    // (اختياري) validate service exists
+        //    var serviceRepo = _uow.Repository<Domain.Entities.Catalog.Service>();
+        //    var service = await serviceRepo.GetByIdAsync(serviceId);
+        //    if (service == null)
+        //        throw new BusinessException("Service not found", 404);
+
+        //    // normalize to slot hour start (your MVP rule)
+        //    var slotHourStart = new DateTime(
+        //        scheduledStart.Year, scheduledStart.Month, scheduledStart.Day,
+        //        scheduledStart.Hour, 0, 0);
+
+        //    // 1) qualified employees for this service
+        //    var linkRepo = _uow.Repository<EmployeeService>();
+        //    var links = await linkRepo.FindAsync(x => x.ServiceId == serviceId && x.IsActive);
+
+        //    var employeeIds = links.Select(x => x.EmployeeId).Distinct().ToList();
+        //    if (employeeIds.Count == 0)
+        //        return new List<EmployeeResponse>();
+
+        //    // 2) filter employees who are working at that time (schedule/shift)
+        //    var scheduleRepo = _uow.Repository<EmployeeWorkSchedule>();
+        //    var shiftRepo = _uow.Repository<Domain.Entities.Employees.Shift>();
+
+        //    var dow = DateOnly.FromDateTime(slotHourStart).DayOfWeek;
+        //    var schedules = await scheduleRepo.FindAsync(s =>
+        //        employeeIds.Contains(s.EmployeeId) &&
+        //        s.DayOfWeek == dow &&
+        //        !s.IsOff);
+
+        //    if (schedules.Count == 0)
+        //        return new List<EmployeeResponse>();
+
+        //    // load shifts referenced
+        //    var shiftIds = schedules.Where(s => s.ShiftId.HasValue).Select(s => s.ShiftId!.Value).Distinct().ToList();
+        //    var shifts = shiftIds.Count == 0
+        //        ? new List<Domain.Entities.Employees.Shift>()
+        //        : (await shiftRepo.FindAsync(x => shiftIds.Contains(x.Id))).ToList();
+
+        //    var shiftMap = shifts.ToDictionary(x => x.Id, x => x);
+
+        //    var hour = TimeOnly.FromDateTime(slotHourStart);
+
+        //    bool IsWorking(EmployeeWorkSchedule s)
+        //    {
+        //        TimeOnly? start = s.StartTime;
+        //        TimeOnly? end = s.EndTime;
+
+        //        if (s.ShiftId.HasValue && shiftMap.TryGetValue(s.ShiftId.Value, out var sh))
+        //        {
+        //            start ??= sh.StartTime;
+        //            end ??= sh.EndTime;
+        //        }
+
+        //        if (start == null || end == null) return false;
+
+        //        // MVP: shift does not cross midnight
+        //        return hour >= start.Value && hour < end.Value;
+        //    }
+
+        //    var workingEmployeeIds = schedules
+        //        .Where(IsWorking)
+        //        .Select(s => s.EmployeeId)
+        //        .Distinct()
+        //        .ToHashSet();
+
+        //    if (workingEmployeeIds.Count == 0)
+        //        return new List<EmployeeResponse>();
+
+        //    // 3) filter out busy employees in same slot (branch + hour)
+        //    // busy = they already have a booking item assigned in another booking at that hour (not cancelled/completed)
+        //    var bookingRepo = _uow.Repository<Booking>();
+        //    var itemRepo = _uow.Repository<BookingItem>();
+
+        //    var bookingsInSlot = await bookingRepo.FindAsync(b =>
+        //        b.BranchId == branchId &&
+        //        b.SlotHourStart == slotHourStart &&
+        //        b.Status != BookingStatus.Cancelled &&
+        //        b.Status != BookingStatus.Completed);
+
+        //    if (bookingsInSlot.Count > 0)
+        //    {
+        //        var bookingIds = bookingsInSlot.Select(b => b.Id).ToList();
+
+        //        var busyItems = await itemRepo.FindAsync(i =>
+        //            bookingIds.Contains(i.BookingId) &&
+        //            i.AssignedEmployeeId != null &&
+        //            workingEmployeeIds.Contains(i.AssignedEmployeeId.Value) &&
+        //            i.Status != BookingItemStatus.Cancelled &&
+        //            i.Status != BookingItemStatus.Done);
+
+        //        var busyEmployeeIds = busyItems
+        //            .Select(i => i.AssignedEmployeeId!.Value)
+        //            .Distinct()
+        //            .ToHashSet();
+
+        //        // available = working - busy
+        //        workingEmployeeIds.ExceptWith(busyEmployeeIds);
+        //    }
+
+        //    if (workingEmployeeIds.Count == 0)
+        //        return new List<EmployeeResponse>();
+
+        //    // 4) load employees details
+        //    var employeeRepo = _uow.Repository<Employee>();
+        //    var employees = await employeeRepo.FindAsync(e =>
+        //        workingEmployeeIds.Contains(e.Id) && e.IsActive);
+
+        //    return employees
+        //        .OrderBy(e => e.Name)
+        //        .Select(e => new EmployeeResponse
+        //        {
+        //            Id = e.Id,
+        //            Name = e.Name,
+        //            PhoneNumber = e.PhoneNumber,
+        //            IsActive = e.IsActive
+        //        })
+        //        .ToList();
+        //}
+
+
+
+        public async Task<EmployeeAvailabilityResponse> GetEmployeesForServiceAtAsync(
+    int bookingId,
+    int serviceId,
+    DateTime scheduledStart)
+        {
+            var bookingRepo = _uow.Repository<Booking>();
+            var itemRepo = _uow.Repository<BookingItem>();
+            var linkRepo = _uow.Repository<EmployeeService>();
+            var empRepo = _uow.Repository<Employee>();
+            var scheduleRepo = _uow.Repository<EmployeeWorkSchedule>();
+            var shiftRepo = _uow.Repository<Domain.Entities.Employees.Shift>();
+
+            var booking = await bookingRepo.GetByIdAsync(bookingId);
+            if (booking == null) throw new BusinessException("Booking not found", 404);
+
+            var branchId = booking.BranchId;
+
+            // normalize to hour slot
+            var slotHourStart = new DateTime(
+                scheduledStart.Year, scheduledStart.Month, scheduledStart.Day,
+                scheduledStart.Hour, 0, 0);
+
+            // 1) qualified employees for service
+            var links = await linkRepo.FindAsync(x => x.ServiceId == serviceId && x.IsActive);
+            var qualifiedIds = links.Select(x => x.EmployeeId).Distinct().ToList();
+            if (qualifiedIds.Count == 0)
+                return new EmployeeAvailabilityResponse { BookingId = bookingId, ServiceId = serviceId, SlotHourStart = slotHourStart };
+
+            // 2) working at that time (schedule/shift)
+            var dow = DateOnly.FromDateTime(slotHourStart).DayOfWeek;
+            var schedules = await scheduleRepo.FindAsync(s =>
+                qualifiedIds.Contains(s.EmployeeId) &&
+                s.DayOfWeek == dow &&
+                !s.IsOff);
+
+            if (schedules.Count == 0)
+                return new EmployeeAvailabilityResponse { BookingId = bookingId, ServiceId = serviceId, SlotHourStart = slotHourStart };
+
+            var shiftIds = schedules.Where(s => s.ShiftId.HasValue).Select(s => s.ShiftId!.Value).Distinct().ToList();
+            var shifts = shiftIds.Count == 0 ? new List<Domain.Entities.Employees.Shift>() : (await shiftRepo.FindAsync(x => shiftIds.Contains(x.Id))).ToList();
+            var shiftMap = shifts.ToDictionary(x => x.Id, x => x);
+
+            var hour = TimeOnly.FromDateTime(slotHourStart);
+
+            bool IsWorking(EmployeeWorkSchedule s)
+            {
+                TimeOnly? start = s.StartTime;
+                TimeOnly? end = s.EndTime;
+
+                if (s.ShiftId.HasValue && shiftMap.TryGetValue(s.ShiftId.Value, out var sh))
+                {
+                    start ??= sh.StartTime;
+                    end ??= sh.EndTime;
+                }
+
+                if (start == null || end == null) return false;
+                return hour >= start.Value && hour < end.Value;
+            }
+
+            var workingIds = schedules.Where(IsWorking).Select(s => s.EmployeeId).Distinct().ToHashSet();
+            if (workingIds.Count == 0)
+                return new EmployeeAvailabilityResponse { BookingId = bookingId, ServiceId = serviceId, SlotHourStart = slotHourStart };
+
+            // 3) find employees busy at same slot in same branch (BUT ignore same bookingId)
+            var bookingsInSlot = await bookingRepo.FindAsync(b =>
+                b.BranchId == branchId &&
+                b.SlotHourStart == slotHourStart &&
+                b.Status != BookingStatus.Cancelled &&
+                b.Status != BookingStatus.Completed);
+
+            var bookingIdsInSlot = bookingsInSlot.Select(b => b.Id).ToList();
+
+            // get items assigned to these employees within those bookings
+            var itemsInSlot = await itemRepo.FindAsync(i =>
+                bookingIdsInSlot.Contains(i.BookingId) &&
+                i.AssignedEmployeeId != null &&
+                workingIds.Contains(i.AssignedEmployeeId.Value) &&
+                i.Status != BookingItemStatus.Cancelled &&
+                i.Status != BookingItemStatus.Done);
+
+            // Busy if BookingId != current bookingId
+            var busyMap = itemsInSlot
+                .Where(i => i.BookingId != bookingId)
+                .GroupBy(i => i.AssignedEmployeeId!.Value)
+                .ToDictionary(g => g.Key, g => g.First().BookingId);
+
+            // 4) load employee names
+            var employees = await empRepo.FindAsync(e => workingIds.Contains(e.Id) && e.IsActive);
+            var empNameMap = employees.ToDictionary(e => e.Id, e => e.Name);
+
+            var resp = new EmployeeAvailabilityResponse
+            {
+                BookingId = bookingId,
+                ServiceId = serviceId,
+                SlotHourStart = slotHourStart
+            };
+
+            foreach (var empId in workingIds.OrderBy(x => x))
+            {
+                empNameMap.TryGetValue(empId, out var name);
+                name ??= "";
+
+                if (busyMap.TryGetValue(empId, out var busyBookingId))
+                {
+                    resp.BusyEmployees.Add(new BusyEmployeeDto
+                    {
+                        EmployeeId = empId,
+                        Name = name,
+                        BusyBookingId = busyBookingId,
+                        Reason = $"Busy in another booking (#{busyBookingId}) at {hour:HH\\:mm}"
+                    });
+                }
+                else
+                {
+                    resp.AvailableEmployees.Add(new EmployeeSimpleDto
+                    {
+                        EmployeeId = empId,
+                        Name = name
+                    });
+                }
+            }
+
+            return resp;
+        }
+
+
+
     }
 }

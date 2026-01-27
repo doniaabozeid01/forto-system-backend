@@ -53,12 +53,25 @@ namespace Forto.Api.Controllers
         }
 
 
-        [HttpGet("{id:int}/employees")]
-        public async Task<IActionResult> GetEmployees(int id)
+        //[HttpGet("{id:int}/employees")]
+        //public async Task<IActionResult> GetEmployees(int id)
+        //{
+        //    var data = await _service.GetEmployeesForServiceAsync(id);
+        //    return OkResponse(data, "OK");
+        //}
+
+
+
+        [HttpGet("bookings/{bookingId:int}/services/{serviceId:int}/employees")]
+        public async Task<IActionResult> GetEmployees(
+            int bookingId,
+            int serviceId,
+            [FromQuery] DateTime scheduledStart)
         {
-            var data = await _service.GetEmployeesForServiceAsync(id);
+            var data = await _service.GetEmployeesForServiceAtAsync(bookingId, serviceId, scheduledStart);
             return OkResponse(data, "OK");
         }
+
 
     }
 
