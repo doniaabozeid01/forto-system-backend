@@ -23,6 +23,8 @@ namespace Forto.Application.DTOs.Billings
         public int? PaidByEmployeeId { get; set; }
         public DateTime? PaidAt { get; set; }
         public PaymentMethod? PaymentMethod { get; set; }
+        public string ClientName { get; set; }
+        public string ClientNumber { get; set; }
 
         public List<InvoiceLineResponse> Lines { get; set; } = new();
     }

@@ -33,7 +33,7 @@ namespace Forto.Application.Abstractions.Services.Bookings
 
 
         Task<TodayBookingsResponse> GetTodayAsync(int branchId, DateOnly date);
-
+        Task<BookingServiceOptionsResponse> GetServiceOptionsAsync(int bookingId);
         // Admin
         //Task CancelBookingItemAsync(int itemId, CashierActionRequest request);
         //Task CancelBookingAsync(int bookingId, CashierActionRequest request);

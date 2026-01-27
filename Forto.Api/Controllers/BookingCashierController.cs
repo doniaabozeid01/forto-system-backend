@@ -47,9 +47,9 @@ namespace Forto.Api.Controllers
 
 
 
-        //[HttpPost("CancelService/{bookingItemId:int}")]
-        //public async Task<IActionResult> CancelService(int bookingItemId, [FromBody] CancelBookingItemByCashierRequest dto)
-        //    => OkResponse(await _itemOps.CancelServiceAsync(bookingItemId, dto), "Service cancelled");
+        [HttpPost("bookings-cashier/booking-items/{bookingItemId:int}/cancel")]
+        public async Task<IActionResult> CancelService(int bookingItemId, [FromBody] CancelBookingItemByCashierRequest dto)
+            => OkResponse(await _itemOps.CancelServiceAsync(bookingItemId, dto), "Service cancelled");
 
 
 

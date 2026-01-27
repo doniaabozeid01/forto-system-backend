@@ -2425,6 +2425,62 @@ namespace Forto.Application.Abstractions.Services.Bookings
 
 
 
+        public async Task<BookingServiceOptionsResponse> GetServiceOptionsAsync(int bookingId)
+        {
+            var bookingRepo = _uow.Repository<Booking>();
+            var itemRepo = _uow.Repository<BookingItem>();
+            var serviceRepo = _uow.Repository<Service>();
+
+            var booking = await bookingRepo.GetByIdAsync(bookingId);
+            if (booking == null) throw new BusinessException("Booking not found", 404);
+
+            // booking items (exclude cancelled)
+            var items = await itemRepo.FindAsync(i => i.BookingId == bookingId && i.Status != BookingItemStatus.Cancelled);
+
+            var inServiceIds = items.Select(i => i.ServiceId).Distinct().ToHashSet();
+
+            // all active services
+            var allServices = await serviceRepo.FindAsync(s => s.IsActive);
+            var serviceMap = allServices.ToDictionary(s => s.Id, s => s.Name);
+
+            // build "in booking" list
+            var inBooking = items.Select(i =>
+            {
+                serviceMap.TryGetValue(i.ServiceId, out var name);
+
+                return new ServiceInBookingDto
+                {
+                    BookingItemId = i.Id,
+                    ServiceId = i.ServiceId,
+                    ServiceName = name ?? "",
+
+                    Status = i.Status,
+                    UnitPrice = i.UnitPrice,
+                    DurationMinutes = i.DurationMinutes,
+                    AssignedEmployeeId = i.AssignedEmployeeId
+                };
+            })
+            .OrderBy(x => x.ServiceName)
+            .ToList();
+
+            // build "not in booking" list
+            var notInBooking = allServices
+                .Where(s => !inServiceIds.Contains(s.Id))
+                .OrderBy(s => s.Name)
+                .Select(s => new ServiceOptionDto
+                {
+                    ServiceId = s.Id,
+                    ServiceName = s.Name
+                })
+                .ToList();
+
+            return new BookingServiceOptionsResponse
+            {
+                BookingId = bookingId,
+                InBooking = inBooking,
+                NotInBooking = notInBooking
+            };
+        }
 
 
 

@@ -109,143 +109,149 @@ namespace Forto.Application.Abstractions.Services.Bookings.Cashier
             return refreshed ?? throw new BusinessException("Booking not found", 404);
         }
 
-        public async Task<BookingResponse> CancelServiceAsync(int bookingItemId, CancelBookingItemByCashierRequest request)
-        {
-            await RequireCashierAsync(request.CashierId);
 
-            var itemRepo = _uow.Repository<BookingItem>();
-            var bookingRepo = _uow.Repository<Booking>();
-            var usageRepo = _uow.Repository<BookingItemMaterialUsage>();
-            var stockRepo = _uow.Repository<BranchMaterialStock>();
-            var movementRepo = _uow.Repository<MaterialMovement>();
-            var invRepo = _uow.Repository<Invoice>();
-            var lineRepo = _uow.Repository<InvoiceLine>();
-            var serviceRepo = _uow.Repository<Service>();
 
-            var item = await itemRepo.GetByIdAsync(bookingItemId);
-            if (item == null) throw new BusinessException("Booking item not found", 404);
 
-            if (item.Status == BookingItemStatus.Done)
-                throw new BusinessException("Cannot cancel a completed service (refund flow needed)", 409);
+        //public async Task<BookingResponse> CancelServiceAsync(int bookingItemId, CancelBookingItemByCashierRequest request)
+        //{
+        //    await RequireCashierAsync(request.CashierId);
 
-            var booking = await bookingRepo.GetByIdAsync(item.BookingId);
-            if (booking == null) throw new BusinessException("Booking not found", 404);
+        //    var itemRepo = _uow.Repository<BookingItem>();
+        //    var bookingRepo = _uow.Repository<Booking>();
+        //    var usageRepo = _uow.Repository<BookingItemMaterialUsage>();
+        //    var stockRepo = _uow.Repository<BranchMaterialStock>();
+        //    var movementRepo = _uow.Repository<MaterialMovement>();
+        //    var invRepo = _uow.Repository<Invoice>();
+        //    var lineRepo = _uow.Repository<InvoiceLine>();
+        //    var serviceRepo = _uow.Repository<Service>();
 
-            // Ensure invoice exists (so we can charge materials used if needed)
-            var invoice = (await invRepo.FindAsync(x => x.BookingId == booking.Id)).FirstOrDefault();
-            if (invoice == null)
-            {
-                var invResp = await _invoiceService.EnsureInvoiceForBookingAsync(booking.Id);
-                // reload invoice entity
-                invoice = await invRepo.GetByIdAsync(invResp.Id);
-            }
+        //    var item = await itemRepo.GetByIdAsync(bookingItemId);
+        //    if (item == null) throw new BusinessException("Booking item not found", 404);
 
-            if (invoice != null && invoice.Status == InvoiceStatus.Paid)
-                throw new BusinessException("Cannot cancel after payment (refund flow needed)", 409);
+        //    if (item.Status == BookingItemStatus.Done)
+        //        throw new BusinessException("Cannot cancel a completed service (refund flow needed)", 409);
 
-            // Pending: just cancel + rebuild service lines
-            if (item.Status == BookingItemStatus.Pending)
-            {
-                item.Status = BookingItemStatus.Cancelled;
-                itemRepo.Update(item);
+        //    var booking = await bookingRepo.GetByIdAsync(item.BookingId);
+        //    if (booking == null) throw new BusinessException("Booking not found", 404);
 
-                if (invoice != null)
-                {
-                    await RebuildServiceLinesForInvoiceAsync(invoice.Id, booking.Id);
-                }
+        //    // Ensure invoice exists (so we can charge materials used if needed)
+        //    var invoice = (await invRepo.FindAsync(x => x.BookingId == booking.Id)).FirstOrDefault();
+        //    if (invoice == null)
+        //    {
+        //        var invResp = await _invoiceService.EnsureInvoiceForBookingAsync(booking.Id);
+        //        // reload invoice entity
+        //        invoice = await invRepo.GetByIdAsync(invResp.Id);
+        //    }
 
-                await _uow.SaveChangesAsync();
+        //    if (invoice != null && invoice.Status == InvoiceStatus.Paid)
+        //        throw new BusinessException("Cannot cancel after payment (refund flow needed)", 409);
 
-                var refreshed = await _bookingService.GetByIdAsync(booking.Id);
-                return refreshed ?? throw new BusinessException("Booking not found", 404);
-            }
+        //    // Pending: just cancel + rebuild service lines
+        //    if (item.Status == BookingItemStatus.Pending)
+        //    {
+        //        item.Status = BookingItemStatus.Cancelled;
+        //        itemRepo.Update(item);
 
-            // InProgress: charge materials used to invoice (UnitCharge), consume stock, release reserved
-            var usages = await usageRepo.FindTrackingAsync(u => u.BookingItemId == item.Id);
-            if (usages.Count == 0)
-                throw new BusinessException("No materials were reserved for this item (start first)", 409);
+        //        if (invoice != null)
+        //        {
+        //            await RebuildServiceLinesForInvoiceAsync(invoice.Id, booking.Id);
+        //        }
 
-            // apply override if provided
-            var overrideMap = request.UsedOverride?.ToDictionary(x => x.MaterialId, x => x.ActualQty) ?? new Dictionary<int, decimal>();
+        //        await _uow.SaveChangesAsync();
 
-            var materialIds = usages.Select(u => u.MaterialId).Distinct().ToList();
-            var stocks = await stockRepo.FindTrackingAsync(s => s.BranchId == booking.BranchId && materialIds.Contains(s.MaterialId));
-            var stockMap = stocks.ToDictionary(s => s.MaterialId, s => s);
+        //        var refreshed = await _bookingService.GetByIdAsync(booking.Id);
+        //        return refreshed ?? throw new BusinessException("Booking not found", 404);
+        //    }
 
-            decimal materialsCharge = 0m;
+        //    // InProgress: charge materials used to invoice (UnitCharge), consume stock, release reserved
+        //    var usages = await usageRepo.FindTrackingAsync(u => u.BookingItemId == item.Id);
+        //    if (usages.Count == 0)
+        //        throw new BusinessException("No materials were reserved for this item (start first)", 409);
 
-            foreach (var u in usages)
-            {
-                if (!stockMap.TryGetValue(u.MaterialId, out var stock))
-                    throw new BusinessException("Stock row missing for a material in this branch", 409);
+        //    // apply override if provided
+        //    var overrideMap = request.UsedOverride?.ToDictionary(x => x.MaterialId, x => x.ActualQty) ?? new Dictionary<int, decimal>();
 
-                var actualUsed = overrideMap.TryGetValue(u.MaterialId, out var ov) ? Math.Max(0, ov) : u.ActualQty;
+        //    var materialIds = usages.Select(u => u.MaterialId).Distinct().ToList();
+        //    var stocks = await stockRepo.FindTrackingAsync(s => s.BranchId == booking.BranchId && materialIds.Contains(s.MaterialId));
+        //    var stockMap = stocks.ToDictionary(s => s.MaterialId, s => s);
 
-                // charge customer for used materials: ActualQty * UnitCharge
-                materialsCharge += actualUsed * u.UnitCharge;
+        //    decimal materialsCharge = 0m;
 
-                // consume onhand (used)
-                stock.OnHandQty -= actualUsed;
-                if (stock.OnHandQty < 0) stock.OnHandQty = 0;
+        //    foreach (var u in usages)
+        //    {
+        //        if (!stockMap.TryGetValue(u.MaterialId, out var stock))
+        //            throw new BusinessException("Stock row missing for a material in this branch", 409);
 
-                // release reserved
-                stock.ReservedQty -= u.ReservedQty;
-                if (stock.ReservedQty < 0) stock.ReservedQty = 0;
+        //        var actualUsed = overrideMap.TryGetValue(u.MaterialId, out var ov) ? Math.Max(0, ov) : u.ActualQty;
 
-                stockRepo.Update(stock);
+        //        // charge customer for used materials: ActualQty * UnitCharge
+        //        materialsCharge += actualUsed * u.UnitCharge;
 
-                // update usage to freeze
-                u.ActualQty = actualUsed;
-                u.ReservedQty = 0;
-                u.ExtraCharge = 0; // service canceled, extra adjustment not used
-                usageRepo.Update(u);
+        //        // consume onhand (used)
+        //        stock.OnHandQty -= actualUsed;
+        //        if (stock.OnHandQty < 0) stock.OnHandQty = 0;
 
-                // record consume movement (it WAS consumed)
-                await movementRepo.AddAsync(new MaterialMovement
-                {
-                    BranchId = booking.BranchId,
-                    MaterialId = u.MaterialId,
-                    MovementType = MaterialMovementType.Consume,
-                    Qty = actualUsed,
-                    UnitCostSnapshot = u.UnitCost,
-                    TotalCost = actualUsed * u.UnitCost,
-                    OccurredAt = DateTime.UtcNow,
-                    BookingId = booking.Id,
-                    BookingItemId = item.Id,
-                    RecordedByEmployeeId = request.CashierId,
-                    Notes = "Consumed on cancel"
-                });
-            }
+        //        // release reserved
+        //        stock.ReservedQty -= u.ReservedQty;
+        //        if (stock.ReservedQty < 0) stock.ReservedQty = 0;
 
-            // add invoice line for materials used
-            var svc = await serviceRepo.GetByIdAsync(item.ServiceId);
-            var serviceName = svc?.Name ?? "Service";
+        //        stockRepo.Update(stock);
 
-            if (invoice != null && materialsCharge > 0)
-            {
-                await lineRepo.AddAsync(new InvoiceLine
-                {
-                    InvoiceId = invoice.Id,
-                    Description = $"Materials used (cancelled) - {serviceName}",
-                    Qty = 1,
-                    UnitPrice = materialsCharge,
-                    Total = materialsCharge
-                });
+        //        // update usage to freeze
+        //        u.ActualQty = actualUsed;
+        //        u.ReservedQty = 0;
+        //        u.ExtraCharge = 0; // service canceled, extra adjustment not used
+        //        usageRepo.Update(u);
 
-                // rebuild service lines (this will remove canceled service line)
-                await RebuildServiceLinesForInvoiceAsync(invoice.Id, booking.Id);
-            }
+        //        // record consume movement (it WAS consumed)
+        //        await movementRepo.AddAsync(new MaterialMovement
+        //        {
+        //            BranchId = booking.BranchId,
+        //            MaterialId = u.MaterialId,
+        //            MovementType = MaterialMovementType.Consume,
+        //            Qty = actualUsed,
+        //            UnitCostSnapshot = u.UnitCost,
+        //            TotalCost = actualUsed * u.UnitCost,
+        //            OccurredAt = DateTime.UtcNow,
+        //            BookingId = booking.Id,
+        //            BookingItemId = item.Id,
+        //            RecordedByEmployeeId = request.CashierId,
+        //            Notes = "Consumed on cancel"
+        //        });
+        //    }
 
-            // cancel item
-            item.Status = BookingItemStatus.Cancelled;
-            item.MaterialAdjustment = 0;
-            itemRepo.Update(item);
+        //    // add invoice line for materials used
+        //    var svc = await serviceRepo.GetByIdAsync(item.ServiceId);
+        //    var serviceName = svc?.Name ?? "Service";
 
-            await _uow.SaveChangesAsync();
+        //    if (invoice != null && materialsCharge > 0)
+        //    {
+        //        await lineRepo.AddAsync(new InvoiceLine
+        //        {
+        //            InvoiceId = invoice.Id,
+        //            Description = $"Materials used (cancelled) - {serviceName}",
+        //            Qty = 1,
+        //            UnitPrice = materialsCharge,
+        //            Total = materialsCharge
+        //        });
 
-            var refreshed2 = await _bookingService.GetByIdAsync(booking.Id);
-            return refreshed2 ?? throw new BusinessException("Booking not found", 404);
-        }
+        //        // rebuild service lines (this will remove canceled service line)
+        //        await RebuildServiceLinesForInvoiceAsync(invoice.Id, booking.Id);
+        //    }
+
+        //    // cancel item
+        //    item.Status = BookingItemStatus.Cancelled;
+        //    item.MaterialAdjustment = 0;
+        //    itemRepo.Update(item);
+
+        //    await _uow.SaveChangesAsync();
+
+        //    var refreshed2 = await _bookingService.GetByIdAsync(booking.Id);
+        //    return refreshed2 ?? throw new BusinessException("Booking not found", 404);
+        //}
+
+
+
 
         // same helper from lifecycle (reuse or move to shared)
         private async Task ReserveMaterialsForItemAsync(Booking booking, BookingItem item, int cashierId)
@@ -309,6 +315,127 @@ namespace Forto.Application.Abstractions.Services.Bookings.Cashier
 
 
 
+        //private async Task RequireCashierAsync(int cashierId)
+        //{
+        //    var emp = await _uow.Repository<Employee>().GetByIdAsync(cashierId);
+        //    if (emp == null || !emp.IsActive)
+        //        throw new BusinessException("Cashier not found", 404);
+
+        //    if (emp.Role != EmployeeRole.Cashier &&
+        //        emp.Role != EmployeeRole.Supervisor &&
+        //        emp.Role != EmployeeRole.Admin)
+        //        throw new BusinessException("Not allowed", 403);
+        //}
+
+        //// Important: rebuild ONLY service lines, keep Product/Gift/Materials used lines
+        //private async Task RebuildServiceLinesForInvoiceAsync(int invoiceId, int bookingId)
+        //{
+        //    var invRepo = _uow.Repository<Invoice>();
+        //    var lineRepo = _uow.Repository<InvoiceLine>();
+        //    var itemRepo = _uow.Repository<BookingItem>();
+        //    var serviceRepo = _uow.Repository<Service>();
+
+        //    var inv = await invRepo.GetByIdAsync(invoiceId);
+        //    if (inv == null) return;
+
+        //    if (inv.Status == InvoiceStatus.Paid)
+        //        throw new BusinessException("Cannot change invoice after payment", 409);
+
+        //    // delete only service lines
+        //    var existingLines = await lineRepo.FindAsync(l => l.InvoiceId == invoiceId);
+        //    foreach (var l in existingLines.Where(x => (x.Description ?? "").Trim().StartsWith("Service:", StringComparison.OrdinalIgnoreCase)))
+        //        lineRepo.Delete(l);
+
+        //    // rebuild service lines from booking items (not cancelled)
+        //    var items = await itemRepo.FindAsync(i => i.BookingId == bookingId && i.Status != BookingItemStatus.Cancelled);
+
+        //    var serviceIds = items.Select(i => i.ServiceId).Distinct().ToList();
+        //    var services = serviceIds.Count == 0 ? new List<Service>() : await serviceRepo.FindAsync(s => serviceIds.Contains(s.Id));
+        //    var map = services.ToDictionary(s => s.Id, s => s.Name);
+
+        //    foreach (var it in items)
+        //    {
+        //        map.TryGetValue(it.ServiceId, out var name);
+
+        //        var lineTotal = it.UnitPrice + it.MaterialAdjustment;
+        //        if (lineTotal < 0) lineTotal = 0;
+
+        //        await lineRepo.AddAsync(new InvoiceLine
+        //        {
+        //            InvoiceId = invoiceId,
+        //            Description = $"Service: {(string.IsNullOrWhiteSpace(name) ? "Service" : name)}",
+        //            Qty = 1,
+        //            UnitPrice = it.UnitPrice,
+        //            Total = lineTotal
+        //        });
+        //    }
+
+        //    // recompute invoice totals from ALL lines (services + products + gifts + materials used)
+        //    var allLinesAfter = await lineRepo.FindAsync(l => l.InvoiceId == invoiceId);
+        //    var subTotal = allLinesAfter.Sum(l => l.Total);
+
+        //    RecalcInvoiceTotals(inv, subTotal);
+        //    invRepo.Update(inv);
+        //}
+
+
+        //private const decimal DefaultVatRate = 0.14m;
+
+        //private static void RecalcInvoiceTotals(Invoice inv, decimal subTotal)
+        //{
+        //    inv.SubTotal = subTotal;
+        //    inv.TaxRate = DefaultVatRate;
+        //    inv.TaxAmount = Math.Round(inv.SubTotal * inv.TaxRate, 2);
+        //    inv.Total = inv.SubTotal + inv.TaxAmount - inv.Discount;
+        //    if (inv.Total < 0) inv.Total = 0;
+        //}
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+        // ---------- helpers ----------
         private async Task RequireCashierAsync(int cashierId)
         {
             var emp = await _uow.Repository<Employee>().GetByIdAsync(cashierId);
@@ -321,7 +448,22 @@ namespace Forto.Application.Abstractions.Services.Bookings.Cashier
                 throw new BusinessException("Not allowed", 403);
         }
 
-        // Important: rebuild ONLY service lines, keep Product/Gift/Materials used lines
+        private const decimal DefaultVatRate = 0.14m;
+
+        private static void RecalcInvoiceTotals(Invoice inv, decimal subTotal)
+        {
+            inv.SubTotal = Math.Round(subTotal, 2);
+            inv.TaxRate = DefaultVatRate;
+            inv.TaxAmount = Math.Round(inv.SubTotal * inv.TaxRate, 2);
+            inv.Total = inv.SubTotal + inv.TaxAmount - inv.Discount;
+            if (inv.Total < 0) inv.Total = 0;
+        }
+
+        /// <summary>
+        /// Rebuild ONLY service lines for this booking invoice.
+        /// Keeps Product/Gift/Materials-used lines intact.
+        /// Then recomputes totals from ALL invoice lines and applies VAT.
+        /// </summary>
         private async Task RebuildServiceLinesForInvoiceAsync(int invoiceId, int bookingId)
         {
             var invRepo = _uow.Repository<Invoice>();
@@ -333,23 +475,29 @@ namespace Forto.Application.Abstractions.Services.Bookings.Cashier
             if (inv == null) return;
 
             if (inv.Status == InvoiceStatus.Paid)
-                throw new BusinessException("Cannot change invoice after payment", 409);
+                throw new BusinessException("Cannot change invoice after payment (refund flow needed)", 409);
 
             // delete only service lines
             var existingLines = await lineRepo.FindAsync(l => l.InvoiceId == invoiceId);
-            foreach (var l in existingLines.Where(x => (x.Description ?? "").Trim().StartsWith("Service:", StringComparison.OrdinalIgnoreCase)))
-                lineRepo.Delete(l);
+            foreach (var l in existingLines)
+            {
+                var desc = (l.Description ?? "").Trim();
+                if (desc.StartsWith("Service:", StringComparison.OrdinalIgnoreCase))
+                    lineRepo.Delete(l);
+            }
 
             // rebuild service lines from booking items (not cancelled)
-            var items = await itemRepo.FindAsync(i => i.BookingId == bookingId && i.Status != BookingItemStatus.Cancelled);
+            var items = await itemRepo.FindAsync(i =>
+                i.BookingId == bookingId &&
+                i.Status != BookingItemStatus.Cancelled);
 
             var serviceIds = items.Select(i => i.ServiceId).Distinct().ToList();
             var services = serviceIds.Count == 0 ? new List<Service>() : await serviceRepo.FindAsync(s => serviceIds.Contains(s.Id));
-            var map = services.ToDictionary(s => s.Id, s => s.Name);
+            var serviceMap = services.ToDictionary(s => s.Id, s => s.Name);
 
             foreach (var it in items)
             {
-                map.TryGetValue(it.ServiceId, out var name);
+                serviceMap.TryGetValue(it.ServiceId, out var name);
 
                 var lineTotal = it.UnitPrice + it.MaterialAdjustment;
                 if (lineTotal < 0) lineTotal = 0;
@@ -364,7 +512,7 @@ namespace Forto.Application.Abstractions.Services.Bookings.Cashier
                 });
             }
 
-            // recompute invoice totals from ALL lines (services + products + gifts + materials used)
+            // totals from ALL lines (services + products + gifts + materials used)
             var allLinesAfter = await lineRepo.FindAsync(l => l.InvoiceId == invoiceId);
             var subTotal = allLinesAfter.Sum(l => l.Total);
 
@@ -372,16 +520,166 @@ namespace Forto.Application.Abstractions.Services.Bookings.Cashier
             invRepo.Update(inv);
         }
 
-
-        private const decimal DefaultVatRate = 0.14m;
-
-        private static void RecalcInvoiceTotals(Invoice inv, decimal subTotal)
+        // ---------- main method ----------
+        public async Task<BookingResponse> CancelServiceAsync(int bookingItemId, CancelBookingItemByCashierRequest request)
         {
-            inv.SubTotal = subTotal;
-            inv.TaxRate = DefaultVatRate;
-            inv.TaxAmount = Math.Round(inv.SubTotal * inv.TaxRate, 2);
-            inv.Total = inv.SubTotal + inv.TaxAmount - inv.Discount;
-            if (inv.Total < 0) inv.Total = 0;
+            await RequireCashierAsync(request.CashierId);
+
+            var itemRepo = _uow.Repository<BookingItem>();
+            var bookingRepo = _uow.Repository<Booking>();
+            var usageRepo = _uow.Repository<BookingItemMaterialUsage>();
+            var stockRepo = _uow.Repository<BranchMaterialStock>();
+            var movementRepo = _uow.Repository<MaterialMovement>();
+            var invRepo = _uow.Repository<Invoice>();
+            var lineRepo = _uow.Repository<InvoiceLine>();
+            var serviceRepo = _uow.Repository<Service>();
+
+            var item = await itemRepo.GetByIdAsync(bookingItemId);
+            if (item == null) throw new BusinessException("Booking item not found", 404);
+
+            if (item.Status == BookingItemStatus.Done)
+                throw new BusinessException("Cannot cancel a completed service (refund flow needed)", 409);
+
+            var booking = await bookingRepo.GetByIdAsync(item.BookingId);
+            if (booking == null) throw new BusinessException("Booking not found", 404);
+
+            // ensure invoice exists
+            var invoice = (await invRepo.FindAsync(x => x.BookingId == booking.Id)).FirstOrDefault();
+            if (invoice == null)
+            {
+                var invResp = await _invoiceService.EnsureInvoiceForBookingAsync(booking.Id);
+                invoice = await invRepo.GetByIdAsync(invResp.Id);
+            }
+
+            if (invoice != null && invoice.Status == InvoiceStatus.Paid)
+                throw new BusinessException("Cannot cancel after payment (refund flow needed)", 409);
+
+            // -------- CASE 1: Pending -> cancel only + rebuild service lines ----------
+            if (item.Status == BookingItemStatus.Pending)
+            {
+                item.Status = BookingItemStatus.Cancelled;
+                itemRepo.Update(item);
+
+                if (invoice != null)
+                    await RebuildServiceLinesForInvoiceAsync(invoice.Id, booking.Id);
+
+                await _uow.SaveChangesAsync(); // ✅ this is where rebuild changes persist
+
+                var refreshed = await _bookingService.GetByIdAsync(booking.Id);
+                return refreshed ?? throw new BusinessException("Booking not found", 404);
+            }
+
+            // -------- CASE 2: InProgress -> charge used materials + consume stock + release reserved ----------
+            var usages = await usageRepo.FindTrackingAsync(u => u.BookingItemId == item.Id);
+            if (usages.Count == 0)
+                throw new BusinessException("No materials were reserved for this item (start first)", 409);
+
+            // ✅ build overrideMap safely (avoid ToDictionary crash)
+            var overrideMap = new Dictionary<int, decimal>();
+            if (request.UsedOverride != null && request.UsedOverride.Count > 0)
+            {
+                var dupIds = request.UsedOverride
+                    .GroupBy(x => x.MaterialId)
+                    .Where(g => g.Count() > 1)
+                    .Select(g => g.Key)
+                    .ToList();
+
+                if (dupIds.Any())
+                    throw new BusinessException("Duplicate materialId in UsedOverride", 400,
+                        new Dictionary<string, string[]>
+                        {
+                            ["usedOverride"] = dupIds.Select(id => $"MaterialId {id} duplicated").ToArray()
+                        });
+
+                // make sure overrides are part of this item
+                var usageMaterialIds = usages.Select(u => u.MaterialId).ToHashSet();
+                var invalid = request.UsedOverride.Where(x => !usageMaterialIds.Contains(x.MaterialId)).Select(x => x.MaterialId).ToList();
+                if (invalid.Any())
+                    throw new BusinessException("Some override materials are not part of this service", 400,
+                        new Dictionary<string, string[]>
+                        {
+                            ["usedOverride"] = invalid.Select(id => $"MaterialId {id} not in this booking item").ToArray()
+                        });
+
+                overrideMap = request.UsedOverride.ToDictionary(x => x.MaterialId, x => x.ActualQty);
+            }
+
+            var materialIds = usages.Select(u => u.MaterialId).Distinct().ToList();
+            var stocks = await stockRepo.FindTrackingAsync(s => s.BranchId == booking.BranchId && materialIds.Contains(s.MaterialId));
+            var stockMap = stocks.ToDictionary(s => s.MaterialId, s => s);
+
+            decimal materialsCharge = 0m;
+
+            foreach (var u in usages)
+            {
+                if (!stockMap.TryGetValue(u.MaterialId, out var stock))
+                    throw new BusinessException("Stock row missing for a material in this branch", 409);
+
+                var actualUsed = overrideMap.TryGetValue(u.MaterialId, out var ov) ? Math.Max(0, ov) : u.ActualQty;
+
+                // charge customer: used qty * unitCharge
+                materialsCharge += actualUsed * u.UnitCharge;
+
+                // consume onhand
+                stock.OnHandQty -= actualUsed;
+                if (stock.OnHandQty < 0) stock.OnHandQty = 0;
+
+                // release reserved
+                stock.ReservedQty -= u.ReservedQty;
+                if (stock.ReservedQty < 0) stock.ReservedQty = 0;
+
+                stockRepo.Update(stock);
+
+                // freeze usage
+                u.ActualQty = actualUsed;
+                u.ReservedQty = 0;
+                u.ExtraCharge = 0;
+                usageRepo.Update(u);
+
+                // movement consume
+                await movementRepo.AddAsync(new MaterialMovement
+                {
+                    BranchId = booking.BranchId,
+                    MaterialId = u.MaterialId,
+                    MovementType = MaterialMovementType.Consume,
+                    Qty = actualUsed,
+                    UnitCostSnapshot = u.UnitCost,
+                    TotalCost = actualUsed * u.UnitCost,
+                    OccurredAt = DateTime.UtcNow,
+                    BookingId = booking.Id,
+                    BookingItemId = item.Id,
+                    RecordedByEmployeeId = request.CashierId,
+                    Notes = "Consumed on cancel"
+                });
+            }
+
+            // add invoice line for materials used
+            var svc = await serviceRepo.GetByIdAsync(item.ServiceId);
+            var serviceName = svc?.Name ?? "Service";
+
+            if (invoice != null && materialsCharge > 0)
+            {
+                await lineRepo.AddAsync(new InvoiceLine
+                {
+                    InvoiceId = invoice.Id,
+                    Description = $"Materials used (cancelled) - {serviceName}",
+                    Qty = 1,
+                    UnitPrice = materialsCharge,
+                    Total = materialsCharge
+                });
+
+                await RebuildServiceLinesForInvoiceAsync(invoice.Id, booking.Id);
+            }
+
+            // cancel item
+            item.Status = BookingItemStatus.Cancelled;
+            item.MaterialAdjustment = 0;
+            itemRepo.Update(item);
+
+            await _uow.SaveChangesAsync();
+
+            var refreshed2 = await _bookingService.GetByIdAsync(booking.Id);
+            return refreshed2 ?? throw new BusinessException("Booking not found", 404);
         }
 
     }

@@ -13,6 +13,6 @@ namespace Forto.Application.DTOs.Billings
         public int ProductId { get; set; }
 
         [Range(0.001, 100000000)]
-        public decimal Qty { get; set; }
+        public int Qty { get; set; }
     }
 }

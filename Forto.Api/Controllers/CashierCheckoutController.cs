@@ -16,12 +16,12 @@ namespace Forto.Api.Controllers
             _service = service;
         }
 
-        //[HttpPost("checkout")]
-        //public async Task<IActionResult> Checkout([FromBody] CashierCheckoutRequest request)
-        //{
-        //    var data = await _service.CheckoutNowAsync(request);
-        //    return OkResponse(data, "Checkout completed");
-        //}
+        [HttpPost("checkout")]
+        public async Task<IActionResult> Checkout([FromBody] CashierCheckoutRequest request)
+        {
+            var data = await _service.CheckoutNowAsync(request);
+            return OkResponse(data, "Checkout completed");
+        }
     }
 
 }
