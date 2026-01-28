@@ -14,12 +14,41 @@ namespace Forto.Api.Controllers
         public BookingItemMaterialsController(IBookingItemMaterialsService service)
             => _service = service;
 
+        //[HttpGet("Get")]
+        //public async Task<IActionResult> Get(int bookingItemId, [FromQuery] int employeeId)
+        //{
+        //    var data = await _service.GetAsync(bookingItemId, employeeId);
+        //    return OkResponse(data, "OK");
+        //}
+
+
+
+
+
+
         [HttpGet("Get")]
-        public async Task<IActionResult> Get(int bookingItemId, [FromQuery] int employeeId)
+        public async Task<IActionResult> Get(int bookingItemId)
         {
-            var data = await _service.GetAsync(bookingItemId, employeeId);
+            var data = await _service.GetAsync(bookingItemId);
             return OkResponse(data, "OK");
         }
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 
 
 
@@ -29,7 +58,7 @@ namespace Forto.Api.Controllers
         //    var data = await _service.UpdateActualAsync(bookingItemId, request);
         //    return OkResponse(data, "Materials updated");
         //}
-    
+
     }
 
 }

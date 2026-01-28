@@ -25,16 +25,56 @@ namespace Forto.Application.Abstractions.Services.Ops.Usage
 
 
 
-        public async Task<BookingItemMaterialsResponse> GetAsync(int bookingItemId, int employeeId)
+        //public async Task<BookingItemMaterialsResponse> GetAsync(int bookingItemId, int employeeId)
+        //{
+        //    // item exists
+        //    var itemRepo = _uow.Repository<BookingItem>();
+        //    var item = await itemRepo.GetByIdAsync(bookingItemId);
+        //    if (item == null) throw new BusinessException("Booking item not found", 404);
+
+        //    // must be assigned to employee (or cashier/supervisor later)
+        //    if (item.AssignedEmployeeId != employeeId)
+        //        throw new BusinessException("Not allowed", 403);
+
+        //    var usageRepo = _uow.Repository<BookingItemMaterialUsage>();
+        //    var usages = await usageRepo.FindAsync(u => u.BookingItemId == bookingItemId);
+        //    if (usages.Count == 0)
+        //        throw new BusinessException("No materials were reserved for this item (start the service first)", 409);
+
+        //    var materialRepo = _uow.Repository<Material>();
+        //    var materialIds = usages.Select(u => u.MaterialId).Distinct().ToList();
+        //    var mats = await materialRepo.FindAsync(m => materialIds.Contains(m.Id));
+        //    var matMap = mats.ToDictionary(m => m.Id, m => m);
+
+        //    return Map(bookingItemId, usages, matMap);
+        //}
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+        public async Task<BookingItemMaterialsResponse> GetAsync(int bookingItemId)
         {
             // item exists
             var itemRepo = _uow.Repository<BookingItem>();
             var item = await itemRepo.GetByIdAsync(bookingItemId);
             if (item == null) throw new BusinessException("Booking item not found", 404);
 
-            // must be assigned to employee (or cashier/supervisor later)
-            if (item.AssignedEmployeeId != employeeId)
-                throw new BusinessException("Not allowed", 403);
 
             var usageRepo = _uow.Repository<BookingItemMaterialUsage>();
             var usages = await usageRepo.FindAsync(u => u.BookingItemId == bookingItemId);
