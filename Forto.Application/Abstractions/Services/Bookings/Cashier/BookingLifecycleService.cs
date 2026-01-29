@@ -70,19 +70,6 @@ namespace Forto.Application.Abstractions.Services.Bookings.Cashier
 
 
 
-
-
-
-
-
-
-
-
-
-
-
-
-
         public async Task<BookingResponse> StartBookingAsync(int bookingId, int cashierId)
         {
             await RequireCashierAsync(cashierId);
@@ -142,23 +129,6 @@ namespace Forto.Application.Abstractions.Services.Bookings.Cashier
             var refreshed = await _bookingService.GetByIdAsync(bookingId);
             return refreshed ?? throw new BusinessException("Booking not found", 404);
         }
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
 
 
         public async Task<BookingResponse> CompleteBookingAsync(int bookingId, int cashierId)
@@ -269,6 +239,8 @@ namespace Forto.Application.Abstractions.Services.Bookings.Cashier
             return refreshed ?? throw new BusinessException("Booking not found", 404);
         }
 
+
+
         // --------- Reservation helper (same logic as StartItem but reused) ----------
         //private async Task ReserveMaterialsForItemAsync(Booking booking, BookingItem item, int cashierId)
         //{
@@ -327,15 +299,6 @@ namespace Forto.Application.Abstractions.Services.Bookings.Cashier
         //        });
         //    }
         //}
-
-
-
-
-
-
-
-
-
 
 
 
@@ -407,18 +370,6 @@ namespace Forto.Application.Abstractions.Services.Bookings.Cashier
                 });
             }
         }
-
-
-
-
-
-
-
-
-
-
-
-
 
 
 

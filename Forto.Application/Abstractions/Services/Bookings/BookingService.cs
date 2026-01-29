@@ -2320,7 +2320,8 @@ namespace Forto.Application.Abstractions.Services.Bookings
             var carMap = cars.ToDictionary(c => c.Id, c => c);
 
             // items count
-            var items = await _uow.Repository<BookingItem>().FindAsync(i => bookingIds.Contains(i.BookingId));
+            var items = await _uow.Repository<BookingItem>().FindAsync(i => bookingIds.Contains(i.BookingId) &&
+    i.Status != BookingItemStatus.Cancelled);
             var countMap = items.GroupBy(i => i.BookingId).ToDictionary(g => g.Key, g => g.Count());
 
             // items by booking
@@ -2330,7 +2331,7 @@ namespace Forto.Application.Abstractions.Services.Bookings
 
             // services names
             var serviceIds = items.Select(i => i.ServiceId).Distinct().ToList();
-            var services = await _uow.Repository<Service>().FindAsync(s => serviceIds.Contains(s.Id));
+            var services = await _uow.Repository<Service>().FindAsync(s => serviceIds.Contains(s.Id) );
             var svcMap = services.ToDictionary(s => s.Id, s => s.Name);
 
 

@@ -32,82 +32,82 @@ namespace Forto.Application.Abstractions.Services.Bookings.Cashier
             _bookingService = bookingService;
         }
 
-        public async Task<BookingResponse> AddServiceAsync(int bookingId, AddServiceToBookingRequest request)
-        {
-            await RequireCashierAsync(request.CashierId);
+        //public async Task<BookingResponse> AddServiceAsync(int bookingId, AddServiceToBookingRequest request)
+        //{
+        //    await RequireCashierAsync(request.CashierId);
 
-            var bookingRepo = _uow.Repository<Booking>();
-            var itemRepo = _uow.Repository<BookingItem>();
-            var carRepo = _uow.Repository<Car>();
-            var rateRepo = _uow.Repository<ServiceRate>();
-            var empServiceRepo = _uow.Repository<EmployeeService>();
+        //    var bookingRepo = _uow.Repository<Booking>();
+        //    var itemRepo = _uow.Repository<BookingItem>();
+        //    var carRepo = _uow.Repository<Car>();
+        //    var rateRepo = _uow.Repository<ServiceRate>();
+        //    var empServiceRepo = _uow.Repository<EmployeeService>();
 
-            var booking = await bookingRepo.GetByIdAsync(bookingId);
-            if (booking == null) throw new BusinessException("Booking not found", 404);
-            if (booking.Status == BookingStatus.Cancelled || booking.Status == BookingStatus.Completed)
-                throw new BusinessException("Cannot modify a closed booking", 409);
+        //    var booking = await bookingRepo.GetByIdAsync(bookingId);
+        //    if (booking == null) throw new BusinessException("Booking not found", 404);
+        //    if (booking.Status == BookingStatus.Cancelled || booking.Status == BookingStatus.Completed)
+        //        throw new BusinessException("Cannot modify a closed booking", 409);
 
-            if (request.AssignedEmployeeId <= 0)
-                throw new BusinessException("AssignedEmployeeId is required", 400);
-
-
+        //    if (request.AssignedEmployeeId <= 0)
+        //        throw new BusinessException("AssignedEmployeeId is required", 400);
 
 
-            var car = await carRepo.GetByIdAsync(booking.CarId);
-            if (car == null) throw new BusinessException("Car not found", 404);
 
-            // employee qualification
-            var qualified = await empServiceRepo.AnyAsync(x =>
-                x.EmployeeId == request.AssignedEmployeeId &&
-                x.ServiceId == request.ServiceId &&
-                x.IsActive);
-            if (!qualified)
-                throw new BusinessException("Employee is not qualified for this service", 409);
 
-            // get rate snapshot
-            var rate = (await rateRepo.FindAsync(r =>
-                r.IsActive &&
-                r.ServiceId == request.ServiceId &&
-                r.BodyType == car.BodyType)).FirstOrDefault();
+        //    var car = await carRepo.GetByIdAsync(booking.CarId);
+        //    if (car == null) throw new BusinessException("Car not found", 404);
 
-            if (rate == null)
-                throw new BusinessException("No rate for this service/body type", 409);
+        //    // employee qualification
+        //    var qualified = await empServiceRepo.AnyAsync(x =>
+        //        x.EmployeeId == request.AssignedEmployeeId &&
+        //        x.ServiceId == request.ServiceId &&
+        //        x.IsActive);
+        //    if (!qualified)
+        //        throw new BusinessException("Employee is not qualified for this service", 409);
 
-            var item = new BookingItem
-            {
-                BookingId = booking.Id,
-                ServiceId = request.ServiceId,
-                BodyType = car.BodyType,
-                UnitPrice = rate.Price,
-                DurationMinutes = rate.DurationMinutes,
-                AssignedEmployeeId = request.AssignedEmployeeId,
-                Status = booking.Status == BookingStatus.InProgress ? BookingItemStatus.InProgress : BookingItemStatus.Pending,
-                StartedAt = booking.Status == BookingStatus.InProgress ? DateTime.UtcNow : null
-            };
+        //    // get rate snapshot
+        //    var rate = (await rateRepo.FindAsync(r =>
+        //        r.IsActive &&
+        //        r.ServiceId == request.ServiceId &&
+        //        r.BodyType == car.BodyType)).FirstOrDefault();
 
-            await itemRepo.AddAsync(item);
-            await _uow.SaveChangesAsync(); // get item.Id
+        //    if (rate == null)
+        //        throw new BusinessException("No rate for this service/body type", 409);
 
-            // if booking already started => reserve materials now
-            if (booking.Status == BookingStatus.InProgress)
-            {
-                await ReserveMaterialsForItemAsync(booking, item, request.CashierId);
-            }
+        //    var item = new BookingItem
+        //    {
+        //        BookingId = booking.Id,
+        //        ServiceId = request.ServiceId,
+        //        BodyType = car.BodyType,
+        //        UnitPrice = rate.Price,
+        //        DurationMinutes = rate.DurationMinutes,
+        //        AssignedEmployeeId = request.AssignedEmployeeId,
+        //        Status = booking.Status == BookingStatus.InProgress ? BookingItemStatus.InProgress : BookingItemStatus.Pending,
+        //        StartedAt = booking.Status == BookingStatus.InProgress ? DateTime.UtcNow : null
+        //    };
 
-            await _uow.SaveChangesAsync();
+        //    await itemRepo.AddAsync(item);
+        //    await _uow.SaveChangesAsync(); // get item.Id
 
-            // if invoice exists and unpaid -> rebuild service lines (avoid deleting products/gifts)
-            var invRepo = _uow.Repository<Invoice>();
-            var existingInv = (await invRepo.FindAsync(x => x.BookingId == booking.Id)).FirstOrDefault();
-            if (existingInv != null && existingInv.Status != InvoiceStatus.Paid)
-            {
-                await RebuildServiceLinesForInvoiceAsync(existingInv.Id, booking.Id);
-                await _uow.SaveChangesAsync();
-            }
+        //    // if booking already started => reserve materials now
+        //    if (booking.Status == BookingStatus.InProgress)
+        //    {
+        //        await ReserveMaterialsForItemAsync(booking, item, request.CashierId);
+        //    }
 
-            var refreshed = await _bookingService.GetByIdAsync(bookingId);
-            return refreshed ?? throw new BusinessException("Booking not found", 404);
-        }
+        //    await _uow.SaveChangesAsync();
+
+        //    // if invoice exists and unpaid -> rebuild service lines (avoid deleting products/gifts)
+        //    var invRepo = _uow.Repository<Invoice>();
+        //    var existingInv = (await invRepo.FindAsync(x => x.BookingId == booking.Id)).FirstOrDefault();
+        //    if (existingInv != null && existingInv.Status != InvoiceStatus.Paid)
+        //    {
+        //        await RebuildServiceLinesForInvoiceAsync(existingInv.Id, booking.Id);
+        //        await _uow.SaveChangesAsync();
+        //    }
+
+        //    var refreshed = await _bookingService.GetByIdAsync(bookingId);
+        //    return refreshed ?? throw new BusinessException("Booking not found", 404);
+        //}
 
 
 
@@ -254,6 +254,110 @@ namespace Forto.Application.Abstractions.Services.Bookings.Cashier
 
 
         // same helper from lifecycle (reuse or move to shared)
+
+
+
+
+
+
+
+
+        public async Task<BookingResponse> AddServiceAsync(int bookingId, AddServiceToBookingRequest request)
+        {
+            await RequireCashierAsync(request.CashierId);
+
+            var bookingRepo = _uow.Repository<Booking>();
+            var itemRepo = _uow.Repository<BookingItem>();
+            var carRepo = _uow.Repository<Car>();
+            var rateRepo = _uow.Repository<ServiceRate>();
+            var empServiceRepo = _uow.Repository<EmployeeService>();
+
+            var booking = await bookingRepo.GetByIdAsync(bookingId);
+            if (booking == null) throw new BusinessException("Booking not found", 404);
+
+            if (booking.Status == BookingStatus.Cancelled || booking.Status == BookingStatus.Completed)
+                throw new BusinessException("Cannot modify a closed booking", 409);
+
+            var car = await carRepo.GetByIdAsync(booking.CarId);
+            if (car == null) throw new BusinessException("Car not found", 404);
+
+            // ✅ if booking is InProgress, employee must be provided
+            if (booking.Status == BookingStatus.InProgress && (!request.AssignedEmployeeId.HasValue || request.AssignedEmployeeId.Value <= 0))
+                throw new BusinessException("AssignedEmployeeId is required when booking is InProgress", 400);
+
+            // ✅ if employee provided, validate qualification
+            if (request.AssignedEmployeeId.HasValue && request.AssignedEmployeeId.Value > 0)
+            {
+                var qualified = await empServiceRepo.AnyAsync(x =>
+                    x.EmployeeId == request.AssignedEmployeeId.Value &&
+                    x.ServiceId == request.ServiceId &&
+                    x.IsActive);
+
+                if (!qualified)
+                    throw new BusinessException("Employee is not qualified for this service", 409);
+            }
+
+            // get rate snapshot
+            var rate = (await rateRepo.FindAsync(r =>
+                r.IsActive &&
+                r.ServiceId == request.ServiceId &&
+                r.BodyType == car.BodyType)).FirstOrDefault();
+
+            if (rate == null)
+                throw new BusinessException("No rate for this service/body type", 409);
+
+            var now = DateTime.UtcNow;
+
+            var item = new BookingItem
+            {
+                BookingId = booking.Id,
+                ServiceId = request.ServiceId,
+                BodyType = car.BodyType,
+                UnitPrice = rate.Price,
+                DurationMinutes = rate.DurationMinutes,
+                AssignedEmployeeId = request.AssignedEmployeeId, // ✅ may be null if booking pending
+                Status = booking.Status == BookingStatus.InProgress ? BookingItemStatus.InProgress : BookingItemStatus.Pending,
+                StartedAt = booking.Status == BookingStatus.InProgress ? now : null
+            };
+
+            await itemRepo.AddAsync(item);
+            await _uow.SaveChangesAsync(); // get item.Id
+
+            // if booking already started => reserve materials now
+            if (booking.Status == BookingStatus.InProgress)
+            {
+                // by rule above, AssignedEmployeeId must exist here
+                await ReserveMaterialsForItemAsync(booking, item, request.CashierId);
+                await _uow.SaveChangesAsync();
+            }
+
+            // if invoice exists and unpaid -> rebuild service lines (keeps products/gifts)
+            var invRepo = _uow.Repository<Invoice>();
+            var existingInv = (await invRepo.FindAsync(x => x.BookingId == booking.Id)).FirstOrDefault();
+            if (existingInv != null && existingInv.Status != InvoiceStatus.Paid)
+            {
+                await RebuildServiceLinesForInvoiceAsync(existingInv.Id, booking.Id);
+                await _uow.SaveChangesAsync();
+            }
+
+            var refreshed = await _bookingService.GetByIdAsync(bookingId);
+            return refreshed ?? throw new BusinessException("Booking not found", 404);
+        }
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
         private async Task ReserveMaterialsForItemAsync(Booking booking, BookingItem item, int cashierId)
         {
             var recipeRepo = _uow.Repository<ServiceMaterialRecipe>();
@@ -521,7 +625,219 @@ namespace Forto.Application.Abstractions.Services.Bookings.Cashier
         }
 
         // ---------- main method ----------
-        public async Task<BookingResponse> CancelServiceAsync(int bookingItemId, CancelBookingItemByCashierRequest request)
+        //public async Task<BookingResponse> CancelServiceAsync(int bookingItemId, CancelBookingItemByCashierRequest request)
+        //{
+        //    await RequireCashierAsync(request.CashierId);
+
+        //    var itemRepo = _uow.Repository<BookingItem>();
+        //    var bookingRepo = _uow.Repository<Booking>();
+        //    var usageRepo = _uow.Repository<BookingItemMaterialUsage>();
+        //    var stockRepo = _uow.Repository<BranchMaterialStock>();
+        //    var movementRepo = _uow.Repository<MaterialMovement>();
+        //    var invRepo = _uow.Repository<Invoice>();
+        //    var lineRepo = _uow.Repository<InvoiceLine>();
+        //    var serviceRepo = _uow.Repository<Service>();
+
+        //    var item = await itemRepo.GetByIdAsync(bookingItemId);
+        //    if (item == null) throw new BusinessException("Booking item not found", 404);
+
+        //    if (item.Status == BookingItemStatus.Done)
+        //        throw new BusinessException("Cannot cancel a completed service (refund flow needed)", 409);
+
+        //    var booking = await bookingRepo.GetByIdAsync(item.BookingId);
+        //    if (booking == null) throw new BusinessException("Booking not found", 404);
+
+        //    // ensure invoice exists
+        //    var invoice = (await invRepo.FindAsync(x => x.BookingId == booking.Id)).FirstOrDefault();
+        //    if (invoice == null)
+        //    {
+        //        var invResp = await _invoiceService.EnsureInvoiceForBookingAsync(booking.Id);
+        //        invoice = await invRepo.GetByIdAsync(invResp.Id);
+        //    }
+
+        //    if (invoice != null && invoice.Status == InvoiceStatus.Paid)
+        //        throw new BusinessException("Cannot cancel after payment (refund flow needed)", 409);
+
+        //    // -------- CASE 1: Pending -> cancel only + rebuild service lines ----------
+        //    if (item.Status == BookingItemStatus.Pending)
+        //    {
+        //        item.Status = BookingItemStatus.Cancelled;
+        //        itemRepo.Update(item);
+
+        //        if (invoice != null)
+        //            await RebuildServiceLinesForInvoiceAsync(invoice.Id, booking.Id);
+
+        //        await _uow.SaveChangesAsync(); // ✅ this is where rebuild changes persist
+
+        //        var refreshed = await _bookingService.GetByIdAsync(booking.Id);
+        //        return refreshed ?? throw new BusinessException("Booking not found", 404);
+        //    }
+
+        //    // -------- CASE 2: InProgress -> charge used materials + consume stock + release reserved ----------
+        //    var usages = await usageRepo.FindTrackingAsync(u => u.BookingItemId == item.Id);
+        //    if (usages.Count == 0)
+        //        throw new BusinessException("No materials were reserved for this item (start first)", 409);
+
+        //    // ✅ build overrideMap safely (avoid ToDictionary crash)
+        //    var overrideMap = new Dictionary<int, decimal>();
+        //    if (request.UsedOverride != null && request.UsedOverride.Count > 0)
+        //    {
+        //        var dupIds = request.UsedOverride
+        //            .GroupBy(x => x.MaterialId)
+        //            .Where(g => g.Count() > 1)
+        //            .Select(g => g.Key)
+        //            .ToList();
+
+        //        if (dupIds.Any())
+        //            throw new BusinessException("Duplicate materialId in UsedOverride", 400,
+        //                new Dictionary<string, string[]>
+        //                {
+        //                    ["usedOverride"] = dupIds.Select(id => $"MaterialId {id} duplicated").ToArray()
+        //                });
+
+        //        // make sure overrides are part of this item
+        //        var usageMaterialIds = usages.Select(u => u.MaterialId).ToHashSet();
+        //        var invalid = request.UsedOverride.Where(x => !usageMaterialIds.Contains(x.MaterialId)).Select(x => x.MaterialId).ToList();
+        //        if (invalid.Any())
+        //            throw new BusinessException("Some override materials are not part of this service", 400,
+        //                new Dictionary<string, string[]>
+        //                {
+        //                    ["usedOverride"] = invalid.Select(id => $"MaterialId {id} not in this booking item").ToArray()
+        //                });
+
+        //        overrideMap = request.UsedOverride.ToDictionary(x => x.MaterialId, x => x.ActualQty);
+        //    }
+
+        //    var materialIds = usages.Select(u => u.MaterialId).Distinct().ToList();
+        //    var stocks = await stockRepo.FindTrackingAsync(s => s.BranchId == booking.BranchId && materialIds.Contains(s.MaterialId));
+        //    var stockMap = stocks.ToDictionary(s => s.MaterialId, s => s);
+
+        //    decimal materialsCharge = 0m;
+
+        //    foreach (var u in usages)
+        //    {
+        //        if (!stockMap.TryGetValue(u.MaterialId, out var stock))
+        //            throw new BusinessException("Stock row missing for a material in this branch", 409);
+
+        //        var actualUsed = overrideMap.TryGetValue(u.MaterialId, out var ov) ? Math.Max(0, ov) : u.ActualQty;
+
+        //        // charge customer: used qty * unitCharge
+        //        materialsCharge += actualUsed * u.UnitCharge;
+
+        //        // consume onhand
+        //        stock.OnHandQty -= actualUsed;
+        //        if (stock.OnHandQty < 0) stock.OnHandQty = 0;
+
+        //        // release reserved
+        //        stock.ReservedQty -= u.ReservedQty;
+        //        if (stock.ReservedQty < 0) stock.ReservedQty = 0;
+
+        //        stockRepo.Update(stock);
+
+        //        // freeze usage
+        //        u.ActualQty = actualUsed;
+        //        u.ReservedQty = 0;
+        //        u.ExtraCharge = 0;
+        //        usageRepo.Update(u);
+
+        //        // movement consume
+        //        await movementRepo.AddAsync(new MaterialMovement
+        //        {
+        //            BranchId = booking.BranchId,
+        //            MaterialId = u.MaterialId,
+        //            MovementType = MaterialMovementType.Consume,
+        //            Qty = actualUsed,
+        //            UnitCostSnapshot = u.UnitCost,
+        //            TotalCost = actualUsed * u.UnitCost,
+        //            OccurredAt = DateTime.UtcNow,
+        //            BookingId = booking.Id,
+        //            BookingItemId = item.Id,
+        //            RecordedByEmployeeId = request.CashierId,
+        //            Notes = "Consumed on cancel"
+        //        });
+        //    }
+
+        //    // add invoice line for materials used
+        //    var svc = await serviceRepo.GetByIdAsync(item.ServiceId);
+        //    var serviceName = svc?.Name ?? "Service";
+
+        //    if (invoice != null && materialsCharge > 0)
+        //    {
+        //        await lineRepo.AddAsync(new InvoiceLine
+        //        {
+        //            InvoiceId = invoice.Id,
+        //            Description = $"Materials used (cancelled) - {serviceName}",
+        //            Qty = 1,
+        //            UnitPrice = materialsCharge,
+        //            Total = materialsCharge
+        //        });
+
+        //        await RebuildServiceLinesForInvoiceAsync(invoice.Id, booking.Id);
+        //    }
+
+        //    // cancel item
+        //    item.Status = BookingItemStatus.Cancelled;
+        //    item.MaterialAdjustment = 0;
+        //    itemRepo.Update(item);
+
+        //    await _uow.SaveChangesAsync();
+
+        //    var refreshed2 = await _bookingService.GetByIdAsync(booking.Id);
+        //    return refreshed2 ?? throw new BusinessException("Booking not found", 404);
+        //}
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+        public async Task<BookingResponse> CancelServiceAsync(
+    int bookingItemId,
+    CancelBookingItemByCashierRequest request)
         {
             await RequireCashierAsync(request.CashierId);
 
@@ -535,15 +851,17 @@ namespace Forto.Application.Abstractions.Services.Bookings.Cashier
             var serviceRepo = _uow.Repository<Service>();
 
             var item = await itemRepo.GetByIdAsync(bookingItemId);
-            if (item == null) throw new BusinessException("Booking item not found", 404);
+            if (item == null)
+                throw new BusinessException("Booking item not found", 404);
 
             if (item.Status == BookingItemStatus.Done)
                 throw new BusinessException("Cannot cancel a completed service (refund flow needed)", 409);
 
             var booking = await bookingRepo.GetByIdAsync(item.BookingId);
-            if (booking == null) throw new BusinessException("Booking not found", 404);
+            if (booking == null)
+                throw new BusinessException("Booking not found", 404);
 
-            // ensure invoice exists
+            // Ensure invoice exists
             var invoice = (await invRepo.FindAsync(x => x.BookingId == booking.Id)).FirstOrDefault();
             if (invoice == null)
             {
@@ -554,27 +872,34 @@ namespace Forto.Application.Abstractions.Services.Bookings.Cashier
             if (invoice != null && invoice.Status == InvoiceStatus.Paid)
                 throw new BusinessException("Cannot cancel after payment (refund flow needed)", 409);
 
-            // -------- CASE 1: Pending -> cancel only + rebuild service lines ----------
+            // =====================================================
+            // CASE 1: Pending → cancel فقط
+            // =====================================================
             if (item.Status == BookingItemStatus.Pending)
             {
                 item.Status = BookingItemStatus.Cancelled;
                 itemRepo.Update(item);
 
+                await _uow.SaveChangesAsync();   // 🔒 save first
+
                 if (invoice != null)
+                {
                     await RebuildServiceLinesForInvoiceAsync(invoice.Id, booking.Id);
+                    await _uow.SaveChangesAsync(); // 🔁 rebuild save
+                }
 
-                await _uow.SaveChangesAsync(); // ✅ this is where rebuild changes persist
-
-                var refreshed = await _bookingService.GetByIdAsync(booking.Id);
-                return refreshed ?? throw new BusinessException("Booking not found", 404);
+                return await _bookingService.GetByIdAsync(booking.Id)
+                       ?? throw new BusinessException("Booking not found", 404);
             }
 
-            // -------- CASE 2: InProgress -> charge used materials + consume stock + release reserved ----------
+            // =====================================================
+            // CASE 2: InProgress → charge materials + consume stock
+            // =====================================================
             var usages = await usageRepo.FindTrackingAsync(u => u.BookingItemId == item.Id);
             if (usages.Count == 0)
                 throw new BusinessException("No materials were reserved for this item (start first)", 409);
 
-            // ✅ build overrideMap safely (avoid ToDictionary crash)
+            // -------- build overrideMap safely --------
             var overrideMap = new Dictionary<int, decimal>();
             if (request.UsedOverride != null && request.UsedOverride.Count > 0)
             {
@@ -585,27 +910,24 @@ namespace Forto.Application.Abstractions.Services.Bookings.Cashier
                     .ToList();
 
                 if (dupIds.Any())
-                    throw new BusinessException("Duplicate materialId in UsedOverride", 400,
-                        new Dictionary<string, string[]>
-                        {
-                            ["usedOverride"] = dupIds.Select(id => $"MaterialId {id} duplicated").ToArray()
-                        });
+                    throw new BusinessException("Duplicate materialId in UsedOverride", 400);
 
-                // make sure overrides are part of this item
-                var usageMaterialIds = usages.Select(u => u.MaterialId).ToHashSet();
-                var invalid = request.UsedOverride.Where(x => !usageMaterialIds.Contains(x.MaterialId)).Select(x => x.MaterialId).ToList();
+                var validMaterialIds = usages.Select(u => u.MaterialId).ToHashSet();
+                var invalid = request.UsedOverride
+                    .Where(x => !validMaterialIds.Contains(x.MaterialId))
+                    .Select(x => x.MaterialId)
+                    .ToList();
+
                 if (invalid.Any())
-                    throw new BusinessException("Some override materials are not part of this service", 400,
-                        new Dictionary<string, string[]>
-                        {
-                            ["usedOverride"] = invalid.Select(id => $"MaterialId {id} not in this booking item").ToArray()
-                        });
+                    throw new BusinessException("Some override materials are not part of this service", 400);
 
                 overrideMap = request.UsedOverride.ToDictionary(x => x.MaterialId, x => x.ActualQty);
             }
 
             var materialIds = usages.Select(u => u.MaterialId).Distinct().ToList();
-            var stocks = await stockRepo.FindTrackingAsync(s => s.BranchId == booking.BranchId && materialIds.Contains(s.MaterialId));
+            var stocks = await stockRepo.FindTrackingAsync(
+                s => s.BranchId == booking.BranchId && materialIds.Contains(s.MaterialId));
+
             var stockMap = stocks.ToDictionary(s => s.MaterialId, s => s);
 
             decimal materialsCharge = 0m;
@@ -615,12 +937,13 @@ namespace Forto.Application.Abstractions.Services.Bookings.Cashier
                 if (!stockMap.TryGetValue(u.MaterialId, out var stock))
                     throw new BusinessException("Stock row missing for a material in this branch", 409);
 
-                var actualUsed = overrideMap.TryGetValue(u.MaterialId, out var ov) ? Math.Max(0, ov) : u.ActualQty;
+                var actualUsed = overrideMap.TryGetValue(u.MaterialId, out var ov)
+                    ? Math.Max(0, ov)
+                    : u.ActualQty;
 
-                // charge customer: used qty * unitCharge
                 materialsCharge += actualUsed * u.UnitCharge;
 
-                // consume onhand
+                // consume
                 stock.OnHandQty -= actualUsed;
                 if (stock.OnHandQty < 0) stock.OnHandQty = 0;
 
@@ -636,7 +959,6 @@ namespace Forto.Application.Abstractions.Services.Bookings.Cashier
                 u.ExtraCharge = 0;
                 usageRepo.Update(u);
 
-                // movement consume
                 await movementRepo.AddAsync(new MaterialMovement
                 {
                     BranchId = booking.BranchId,
@@ -654,11 +976,11 @@ namespace Forto.Application.Abstractions.Services.Bookings.Cashier
             }
 
             // add invoice line for materials used
-            var svc = await serviceRepo.GetByIdAsync(item.ServiceId);
-            var serviceName = svc?.Name ?? "Service";
-
             if (invoice != null && materialsCharge > 0)
             {
+                var svc = await serviceRepo.GetByIdAsync(item.ServiceId);
+                var serviceName = svc?.Name ?? "Service";
+
                 await lineRepo.AddAsync(new InvoiceLine
                 {
                     InvoiceId = invoice.Id,
@@ -667,8 +989,6 @@ namespace Forto.Application.Abstractions.Services.Bookings.Cashier
                     UnitPrice = materialsCharge,
                     Total = materialsCharge
                 });
-
-                await RebuildServiceLinesForInvoiceAsync(invoice.Id, booking.Id);
             }
 
             // cancel item
@@ -676,11 +996,23 @@ namespace Forto.Application.Abstractions.Services.Bookings.Cashier
             item.MaterialAdjustment = 0;
             itemRepo.Update(item);
 
+            // 🔒 SAVE FIRST
             await _uow.SaveChangesAsync();
 
-            var refreshed2 = await _bookingService.GetByIdAsync(booking.Id);
-            return refreshed2 ?? throw new BusinessException("Booking not found", 404);
+            // 🔁 THEN rebuild invoice
+            if (invoice != null)
+            {
+                await RebuildServiceLinesForInvoiceAsync(invoice.Id, booking.Id);
+                await _uow.SaveChangesAsync();
+            }
+
+            return await _bookingService.GetByIdAsync(booking.Id)
+                   ?? throw new BusinessException("Booking not found", 404);
         }
+
+
+
+
 
     }
 

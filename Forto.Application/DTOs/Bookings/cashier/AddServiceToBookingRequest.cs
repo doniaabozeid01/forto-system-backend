@@ -10,7 +10,7 @@ namespace Forto.Application.DTOs.Bookings.cashier
     {
         public int CashierId { get; set; }
         public int ServiceId { get; set; }
-        public int AssignedEmployeeId { get; set; } // لازم نعرف مين هيعملها
+        public int? AssignedEmployeeId { get; set; }
     }
 
 }
