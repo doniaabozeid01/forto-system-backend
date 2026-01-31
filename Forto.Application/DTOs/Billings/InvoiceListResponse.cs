@@ -25,26 +25,23 @@ namespace Forto.Application.DTOs.Billings
 public class InvoiceListItemDto
 {
     public int InvoiceId { get; set; }
-        public string InvoiceNumber { get; set; } = "";
-
-        public DateTime Date { get; set; }
-
+    public string InvoiceNumber { get; set; } = "";
+    public DateTime Date { get; set; }
     public PaymentMethod? PaymentMethod { get; set; }
     public decimal SubTotal { get; set; }
     public decimal Discount { get; set; }
     public decimal Total { get; set; }
-
+    public InvoiceStatus? status { get; set; }
     public string CustomerName { get; set; } = "";
     public string CustomerPhone { get; set; } = "";
-
     // نص سريع للعرض (اختياري تسيبيه)
     public string ItemsText { get; set; } = "";
+    public List<InvoiceLineListDto> Lines { get; set; } = new();
 
-        // ✅ الجديد: تفاصيل محتوى الفاتورة
+    // ✅ الجديد: تفاصيل محتوى الفاتورة
 
-        //public string Services { get; set; } = ""; // نص للعرض
+    //public string Services { get; set; } = ""; // نص للعرض
 
-        public List<InvoiceLineListDto> Lines { get; set; } = new();
 }
 
 public class InvoiceLineListDto

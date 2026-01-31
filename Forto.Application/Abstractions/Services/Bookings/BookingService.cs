@@ -2369,6 +2369,7 @@ namespace Forto.Application.Abstractions.Services.Bookings
                     PhoneNumber = cl?.PhoneNumber ?? "",
                     CarId = b.CarId,
                     PlateNumber = car?.PlateNumber ?? "",
+                    CarModel = car?.Model,
                     TotalPrice = b.TotalPrice,
                     ServicesCount = servicesLines.Count,
                     Services = servicesLines

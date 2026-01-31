@@ -600,6 +600,30 @@ namespace Forto.Infrastructure.Data
 
 
 
+
+
+
+
+
+            modelBuilder.Entity<InvoiceLine>()
+    .Property(x => x.LineType)
+    .HasConversion<int>();
+
+modelBuilder.Entity<InvoiceLine>()
+    .Property(x => x.UnitPrice)
+    .HasPrecision(18, 2);
+
+modelBuilder.Entity<InvoiceLine>()
+    .Property(x => x.Total)
+    .HasPrecision(18, 2);
+
+// Optional index for faster queries
+modelBuilder.Entity<InvoiceLine>()
+    .HasIndex(x => new { x.InvoiceId, x.LineType });
+
+
+
+
         }
 
         private static void SetSoftDeleteFilter<TEntity>(ModelBuilder builder) where TEntity : BaseEntity

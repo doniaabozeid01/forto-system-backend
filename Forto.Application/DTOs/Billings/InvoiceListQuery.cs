@@ -16,6 +16,8 @@ namespace Forto.Application.DTOs.Billings
         public string? PaymentMethod { get; set; } // "all" | "cash"
         public string? Q { get; set; } // invoiceId OR phone OR name
 
+        public string? status { get; set; }
+
         public int Page { get; set; } = 1;
         public int PageSize { get; set; } = 20;
     }

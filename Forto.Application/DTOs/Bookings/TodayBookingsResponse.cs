@@ -30,6 +30,7 @@ namespace Forto.Application.DTOs.Bookings
 
         public int CarId { get; set; }
         public string PlateNumber { get; set; } = "";
+        public string CarModel { get; set; } = "";
 
         public decimal TotalPrice { get; set; }
         public int ServicesCount { get; set; }

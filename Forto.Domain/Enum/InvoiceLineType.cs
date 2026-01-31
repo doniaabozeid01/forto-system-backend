@@ -6,10 +6,12 @@ using System.Threading.Tasks;
 
 namespace Forto.Domain.Enum
 {
-    public enum InvoiceStatus
+    public enum InvoiceLineType
     {
-        Unpaid = 1,  
-        Paid = 2,    
-        Cancelled = 3
+        Service = 1,
+        Product = 2,
+        Gift = 3,
+        MaterialsUsed = 4
     }
+
 }
