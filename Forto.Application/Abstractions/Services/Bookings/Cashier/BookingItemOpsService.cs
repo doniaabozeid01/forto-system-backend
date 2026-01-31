@@ -1091,8 +1091,9 @@ namespace Forto.Application.Abstractions.Services.Bookings.Cashier
                 item.Status = BookingItemStatus.Cancelled;
                 item.MaterialAdjustment = 0;
                 itemRepo.Update(item);
-                await RecalculateBookingTotalsAsync(booking.Id);
 
+                await _uow.SaveChangesAsync(); // save cancel first
+                await RecalculateBookingTotalsAsync(booking.Id);
                 await _uow.SaveChangesAsync(); // save cancel first
 
                 if (invoice != null)
@@ -1193,7 +1194,6 @@ namespace Forto.Application.Abstractions.Services.Bookings.Cashier
             item.Status = BookingItemStatus.Cancelled;
             item.MaterialAdjustment = 0;
             itemRepo.Update(item);
-            await RecalculateBookingTotalsAsync(booking.Id);
 
             // add invoice line for materials used ONLY (no service price)
             if (invoice != null && materialsCharge > 0)
@@ -1213,10 +1213,9 @@ namespace Forto.Application.Abstractions.Services.Bookings.Cashier
                 });
             }
 
-            booking.TotalPrice -= item.UnitPrice;
-            bookingRepo.Update(booking);
-
             // ✅ Save all changes FIRST
+            await _uow.SaveChangesAsync();
+            await RecalculateBookingTotalsAsync(booking.Id);
             await _uow.SaveChangesAsync();
 
             // ✅ Then rebuild service lines (will remove cancelled service line if existed) + recompute totals from ALL lines
