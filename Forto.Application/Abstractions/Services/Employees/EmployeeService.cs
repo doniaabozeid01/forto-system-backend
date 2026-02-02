@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Text;
@@ -57,12 +57,15 @@ namespace Forto.Application.Abstractions.Services.Employees
 
 
 
+        /// <summary>
+        /// إنشاء موظف + حساب دخول (Auth). مسموح فقط لـ Cashier أو Admin — لو عامل لا تستدعِ هذا؛ استخدم Create فقط.
+        /// </summary>
         public async Task<EmployeeResponse> CreateEmployeeUserAsync(CreateEmployeeUserRequest req)
         {
             var role = req.Role.Trim().ToLowerInvariant();
-            var allowed = new[] { "worker", "cashier", "admin" };
-            if (!allowed.Contains(role))
-                throw new BusinessException("Invalid role", 400);
+            var authAllowed = new[] { "cashier", "admin" };
+            if (!authAllowed.Contains(role))
+                throw new BusinessException("Auth (login) is only for Cashier or Admin. For Worker use Create employee without user.", 400);
 
             var phone = req.PhoneNumber.Trim();
 

@@ -1,33 +1,35 @@
-﻿using Microsoft.AspNetCore.Http;
+using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
-    using Microsoft.AspNetCore.Mvc;
-    using Microsoft.AspNetCore.Identity;
-    using Microsoft.IdentityModel.Tokens;
-    using System.IdentityModel.Tokens.Jwt;
-    using System.Security.Claims;
-    using System.Text;
-    using Forto.Application.DTOs.Identity;
-    using Forto.Domain.Entities.Identity;
-    using Microsoft.EntityFrameworkCore;
-    using System.Linq;
+using Microsoft.AspNetCore.Identity;
+using Microsoft.IdentityModel.Tokens;
+using System.IdentityModel.Tokens.Jwt;
+using System.Security.Claims;
+using System.Text;
+using Forto.Application.Abstractions.Repositories;
+using Forto.Application.DTOs.Identity;
+using Forto.Domain.Entities.Identity;
+using Forto.Domain.Entities.Employees;
+using Microsoft.EntityFrameworkCore;
 
 namespace Forto.Api.Controllers
 {
-
     [Route("api/auth")]
     public class AuthController : ControllerBase
     {
         private readonly UserManager<ApplicationUser> _userManager;
         private readonly RoleManager<ApplicationRole> _roleManager;
+        private readonly IUnitOfWork _uow;
         private readonly IConfiguration _config;
 
         public AuthController(
             UserManager<ApplicationUser> userManager,
             RoleManager<ApplicationRole> roleManager,
+            IUnitOfWork uow,
             IConfiguration config)
         {
             _userManager = userManager;
             _roleManager = roleManager;
+            _uow = uow;
             _config = config;
         }
 
@@ -85,8 +87,26 @@ namespace Forto.Api.Controllers
             var roles = await _userManager.GetRolesAsync(user);
             var role = roles.FirstOrDefault() ?? "client";
 
+            // اسم الموظف و EmployeeId إن وُجد (للدخول برقم التليفون)
+            string? fullName = null;
+            int? employeeId = null;
+            var empRepo = _uow.Repository<Employee>();
+            var employee = (await empRepo.FindAsync(e => e.UserId == user.Id)).FirstOrDefault();
+            if (employee != null)
+            {
+                fullName = employee.Name;
+                employeeId = employee.Id;
+            }
+
             var token = await CreateJwtAsync(user, role);
-            return Ok(new AuthResponse { Token = token, Role = role, PhoneNumber = phone });
+            return Ok(new AuthResponse
+            {
+                Token = token,
+                Role = role,
+                PhoneNumber = phone,
+                FullName = fullName,
+                EmployeeId = employeeId
+            });
         }
 
         private Task<string> CreateJwtAsync(ApplicationUser user, string role)
