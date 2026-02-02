@@ -1,4 +1,4 @@
-﻿using Forto.Api.Common;
+using Forto.Api.Common;
 using Forto.Application.Abstractions.Repositories;
 using Forto.Application.Abstractions.Services.Invoices;
 using Forto.Application.DTOs.Bookings.cashier;
@@ -321,8 +321,6 @@ namespace Forto.Application.Abstractions.Services.Bookings.Cashier
             };
 
             await itemRepo.AddAsync(item);
-            booking.TotalPrice += rate.Price;
-            bookingRepo.Update(booking);
             await _uow.SaveChangesAsync(); // get item.Id
 
             // if booking already started => reserve materials now
@@ -333,20 +331,106 @@ namespace Forto.Application.Abstractions.Services.Bookings.Cashier
                 await _uow.SaveChangesAsync();
             }
 
-            // if invoice exists and unpaid -> rebuild service lines (keeps products/gifts)
-            //var invRepo = _uow.Repository<Invoice>();
-            //var existingInv = (await invRepo.FindAsync(x => x.BookingId == booking.Id)).FirstOrDefault();
-            //if (existingInv != null && existingInv.Status != InvoiceStatus.Paid)
-            //{
-            //    await RebuildServiceLinesForInvoiceAsync(existingInv.Id, booking.Id);
-            //    await _uow.SaveChangesAsync();
-            //}
+            // recalculate booking totals from source of truth (all non-cancelled items)
+            await RecalculateBookingTotalsAsync(booking.Id);
+            await _uow.SaveChangesAsync();
+
+            // لا ننشئ فاتورة هنا - الفاتورة تُنشأ فقط عند complete الحجز
 
             var refreshed = await _bookingService.GetByIdAsync(bookingId);
             return refreshed ?? throw new BusinessException("Booking not found", 404);
         }
 
 
+        public async Task<BookingResponse> AddServicesAsync(int bookingId, AddServicesToBookingRequest request)
+        {
+            await RequireCashierAsync(request.CashierId);
+
+            var serviceIds = request.ServiceIds?.Distinct().Where(id => id > 0).ToList() ?? new List<int>();
+            if (serviceIds.Count == 0)
+                throw new BusinessException("At least one ServiceId is required", 400);
+
+            var bookingRepo = _uow.Repository<Booking>();
+            var itemRepo = _uow.Repository<BookingItem>();
+            var carRepo = _uow.Repository<Car>();
+            var rateRepo = _uow.Repository<ServiceRate>();
+            var empServiceRepo = _uow.Repository<EmployeeService>();
+
+            var booking = await bookingRepo.GetByIdAsync(bookingId);
+            if (booking == null) throw new BusinessException("Booking not found", 404);
+
+            if (booking.Status == BookingStatus.Cancelled || booking.Status == BookingStatus.Completed)
+                throw new BusinessException("Cannot modify a closed booking", 409);
+
+            var car = await carRepo.GetByIdAsync(booking.CarId);
+            if (car == null) throw new BusinessException("Car not found", 404);
+
+            if (booking.Status == BookingStatus.InProgress && (!request.AssignedEmployeeId.HasValue || request.AssignedEmployeeId.Value <= 0))
+                throw new BusinessException("AssignedEmployeeId is required when booking is InProgress", 400);
+
+            var rates = await rateRepo.FindAsync(r =>
+                r.IsActive &&
+                serviceIds.Contains(r.ServiceId) &&
+                r.BodyType == car.BodyType);
+            var rateMap = rates.ToDictionary(r => r.ServiceId, r => r);
+
+            foreach (var sid in serviceIds)
+            {
+                if (!rateMap.ContainsKey(sid))
+                    throw new BusinessException($"No rate for service {sid} and body type {car.BodyType}", 409);
+
+                if (booking.Status == BookingStatus.InProgress && request.AssignedEmployeeId.HasValue)
+                {
+                    var qualified = await empServiceRepo.AnyAsync(x =>
+                        x.EmployeeId == request.AssignedEmployeeId.Value &&
+                        x.ServiceId == sid &&
+                        x.IsActive);
+                    if (!qualified)
+                        throw new BusinessException($"Employee is not qualified for service {sid}", 409);
+                }
+            }
+
+            var now = DateTime.UtcNow;
+            var status = booking.Status == BookingStatus.InProgress ? BookingItemStatus.InProgress : BookingItemStatus.Pending;
+            var addedItems = new List<BookingItem>();
+
+            foreach (var sid in serviceIds)
+            {
+                var rate = rateMap[sid];
+                var item = new BookingItem
+                {
+                    BookingId = booking.Id,
+                    ServiceId = sid,
+                    BodyType = car.BodyType,
+                    UnitPrice = rate.Price,
+                    DurationMinutes = rate.DurationMinutes,
+                    AssignedEmployeeId = request.AssignedEmployeeId,
+                    Status = status,
+                    StartedAt = booking.Status == BookingStatus.InProgress ? now : null
+                };
+                await itemRepo.AddAsync(item);
+                addedItems.Add(item);
+            }
+
+            await _uow.SaveChangesAsync();
+
+            if (booking.Status == BookingStatus.InProgress)
+            {
+                foreach (var item in addedItems)
+                {
+                    await ReserveMaterialsForItemAsync(booking, item, request.CashierId);
+                }
+                await _uow.SaveChangesAsync();
+            }
+
+            await RecalculateBookingTotalsAsync(booking.Id);
+            await _uow.SaveChangesAsync();
+
+            // لا ننشئ فاتورة هنا - الفاتورة تُنشأ فقط عند complete الحجز
+
+            var refreshed = await _bookingService.GetByIdAsync(bookingId);
+            return refreshed ?? throw new BusinessException("Booking not found", 404);
+        }
 
 
 
@@ -583,12 +667,13 @@ namespace Forto.Application.Abstractions.Services.Bookings.Cashier
             if (inv.Status == InvoiceStatus.Paid)
                 throw new BusinessException("Cannot change invoice after payment (refund flow needed)", 409);
 
-            // delete only service lines
+            // delete service lines: by LineType AND by Description (legacy lines may have LineType=0)
             var existingLines = await lineRepo.FindAsync(l => l.InvoiceId == invoiceId);
             foreach (var l in existingLines)
             {
-                var desc = (l.Description ?? "").Trim();
-                if (desc.StartsWith("Service:", StringComparison.OrdinalIgnoreCase))
+                var isServiceLine = l.LineType == InvoiceLineType.Service ||
+                    ((l.Description ?? "").Trim().StartsWith("Service:", StringComparison.OrdinalIgnoreCase));
+                if (isServiceLine)
                     lineRepo.Delete(l);
             }
 
@@ -611,6 +696,8 @@ namespace Forto.Application.Abstractions.Services.Bookings.Cashier
                 await lineRepo.AddAsync(new InvoiceLine
                 {
                     InvoiceId = invoiceId,
+                    LineType = InvoiceLineType.Service,
+                    BookingItemId = it.Id,
                     Description = $"Service: {(string.IsNullOrWhiteSpace(name) ? "Service" : name)}",
                     Qty = 1,
                     UnitPrice = it.UnitPrice,
@@ -1072,13 +1159,8 @@ namespace Forto.Application.Abstractions.Services.Bookings.Cashier
             var booking = await bookingRepo.GetByIdAsync(item.BookingId);
             if (booking == null) throw new BusinessException("Booking not found", 404);
 
-            // Ensure invoice exists
+            // Get invoice if exists (do NOT create on cancel - invoice is created at checkout)
             var invoice = (await invRepo.FindAsync(x => x.BookingId == booking.Id)).FirstOrDefault();
-            if (invoice == null)
-            {
-                var invResp = await _invoiceService.EnsureInvoiceForBookingAsync(booking.Id);
-                invoice = await invRepo.GetByIdAsync(invResp.Id);
-            }
 
             if (invoice != null && invoice.Status == InvoiceStatus.Paid)
                 throw new BusinessException("Cannot cancel after payment (refund flow needed)", 409);
@@ -1185,7 +1267,7 @@ namespace Forto.Application.Abstractions.Services.Bookings.Cashier
                     OccurredAt = now,
                     BookingId = booking.Id,
                     BookingItemId = item.Id,
-                    RecordedByEmployeeId = request.CashierId,
+                    //RecordedByEmployeeId = request.CashierId,
                     Notes = "Consumed on cancel"
                 });
             }
@@ -1248,7 +1330,7 @@ namespace Forto.Application.Abstractions.Services.Bookings.Cashier
                 i.BookingId == bookingId &&
                 i.Status != BookingItemStatus.Cancelled);
 
-            booking.TotalPrice = items.Sum(i => i.UnitPrice); // أو + MaterialAdjustment لو انتي بتضيفيه هنا
+            booking.TotalPrice = items.Sum(i => i.UnitPrice + i.MaterialAdjustment);
             booking.EstimatedDurationMinutes = items.Sum(i => i.DurationMinutes);
 
             bookingRepo.Update(booking);

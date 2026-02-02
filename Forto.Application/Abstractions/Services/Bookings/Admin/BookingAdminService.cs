@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Text;
@@ -482,7 +482,7 @@ namespace Forto.Application.Abstractions.Services.Bookings.Admin
                         OccurredAt = occurredAt,
                         BookingId = booking.Id,
                         BookingItemId = item.Id,
-                        RecordedByEmployeeId = request.CashierId,
+                        //RecordedByEmployeeId = request.CashierId,
                         Notes = request.Reason
                     });
                 }
@@ -561,8 +561,7 @@ namespace Forto.Application.Abstractions.Services.Bookings.Admin
 
             if (booking.Status == BookingStatus.Completed)
             {
-                // ensure invoice
-                await _invoiceService.EnsureInvoiceForBookingAsync(bookingId);
+                // already completed, nothing to cancel (invoice was created on complete)
                 return;
             }
 

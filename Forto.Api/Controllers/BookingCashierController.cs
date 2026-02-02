@@ -1,4 +1,4 @@
-﻿using Forto.Application.Abstractions.Services.Bookings.Cashier;
+using Forto.Application.Abstractions.Services.Bookings.Cashier;
 using Forto.Application.DTOs.Bookings.cashier;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
@@ -43,6 +43,14 @@ namespace Forto.Api.Controllers
         [HttpPost("bookings-cashier/{bookingId:int}/services")]
         public async Task<IActionResult> AddService(int bookingId, [FromBody] AddServiceToBookingRequest dto)
             => OkResponse(await _itemOps.AddServiceAsync(bookingId, dto), "Service added");
+
+
+
+
+        [HttpPost("bookings-cashier/{bookingId:int}/services/bulk")]
+        public async Task<IActionResult> AddServices(int bookingId, [FromBody] AddServicesToBookingRequest dto)
+            => OkResponse(await _itemOps.AddServicesAsync(bookingId, dto), "Services added");
+
 
 
 

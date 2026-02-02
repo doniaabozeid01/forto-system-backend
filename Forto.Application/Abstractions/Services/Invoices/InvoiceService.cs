@@ -1,4 +1,4 @@
-﻿using Forto.Api.Common;
+using Forto.Api.Common;
 using Forto.Application.Abstractions.Repositories;
 using Forto.Application.DTOs.Billings;
 using Forto.Application.DTOs.Billings.cashier;
@@ -3386,6 +3386,12 @@ namespace Forto.Application.Abstractions.Services.Invoices
             var existing = (await invRepo.FindAsync(x => x.BookingId == bookingId)).FirstOrDefault();
             if (existing != null)
             {
+                // إذا الفاتورة موجودة وغير مدفوعة: أعد بناء بنود الخدمات من الحجز الحالي
+                if (existing.Status != InvoiceStatus.Paid)
+                {
+                    await RebuildServiceLinesForInvoiceAsync(existing.Id, bookingId);
+                    await _uow.SaveChangesAsync();
+                }
                 var exLines = await lineRepo.FindAsync(l => l.InvoiceId == existing.Id);
                 existing.Lines = exLines.ToList();
                 return Map(existing);
@@ -3419,7 +3425,10 @@ namespace Forto.Application.Abstractions.Services.Invoices
             invoice.InvoiceNumber = $"for-{DateTime.UtcNow.Year}-{invoice.Id:D3}";
             invRepo.Update(invoice);
 
-            // build SERVICE lines
+            // build SERVICE lines + calculate subTotal in memory (before save)
+            var createdLines = new List<InvoiceLine>();
+            decimal subTotal = 0m;
+
             foreach (var it in items)
             {
                 serviceMap.TryGetValue(it.ServiceId, out var name);
@@ -3427,7 +3436,7 @@ namespace Forto.Application.Abstractions.Services.Invoices
                 var lineTotal = it.UnitPrice + it.MaterialAdjustment;
                 if (lineTotal < 0) lineTotal = 0;
 
-                await lineRepo.AddAsync(new InvoiceLine
+                var line = new InvoiceLine
                 {
                     InvoiceId = invoice.Id,
                     LineType = InvoiceLineType.Service,
@@ -3436,19 +3445,19 @@ namespace Forto.Application.Abstractions.Services.Invoices
                     Qty = 1,
                     UnitPrice = it.UnitPrice,
                     Total = lineTotal
-                });
-            }
+                };
 
-            // totals from lines (services only for now)
-            var serviceLines = await lineRepo.FindAsync(l => l.InvoiceId == invoice.Id);
-            var subTotal = serviceLines.Sum(l => l.Total);
+                await lineRepo.AddAsync(line);
+                createdLines.Add(line);
+                subTotal += lineTotal;
+            }
 
             RecalcInvoiceTotals(invoice, subTotal);
             invRepo.Update(invoice);
 
             await _uow.SaveChangesAsync();
 
-            invoice.Lines = serviceLines.ToList();
+            invoice.Lines = createdLines;
             return Map(invoice);
         }
 
@@ -3473,10 +3482,15 @@ namespace Forto.Application.Abstractions.Services.Invoices
             if (inv.Status == InvoiceStatus.Paid)
                 throw new BusinessException("Cannot change invoice after payment (refund flow needed)", 409);
 
-            // 1) delete ONLY service lines
+            // 1) delete service lines (by LineType AND Description for legacy lines with LineType=0)
             var existingLines = await lineRepo.FindAsync(l => l.InvoiceId == invoiceId);
-            foreach (var l in existingLines.Where(x => x.LineType == InvoiceLineType.Service))
-                lineRepo.Delete(l);
+            foreach (var l in existingLines)
+            {
+                var isServiceLine = l.LineType == InvoiceLineType.Service ||
+                    ((l.Description ?? "").Trim().StartsWith("Service:", StringComparison.OrdinalIgnoreCase));
+                if (isServiceLine)
+                    lineRepo.Delete(l);
+            }
 
             // 2) rebuild service lines from booking items not cancelled
             var items = await itemRepo.FindAsync(i => i.BookingId == bookingId && i.Status != BookingItemStatus.Cancelled);

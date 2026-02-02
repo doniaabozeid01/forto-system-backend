@@ -27,7 +27,6 @@ namespace Forto.Domain.Entities.Ops
         public int? BookingId { get; set; }              // اختياري
         public int? BookingItemId { get; set; }          // ✅ مهم للـ Waste/Consume
 
-        public int? RecordedByEmployeeId { get; set; }   // الكاشير/العامل
         public string? Notes { get; set; }
     }
 

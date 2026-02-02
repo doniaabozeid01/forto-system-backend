@@ -149,7 +149,7 @@ namespace Forto.Application.Abstractions.Services.Ops.Stock.StockMovement
                 UnitCostSnapshot = unitCost,
                 TotalCost = request.Qty * unitCost,
                 OccurredAt = occurred,
-                RecordedByEmployeeId = request.CashierId,
+                //RecordedByEmployeeId = request.CashierId,
                 Notes = request.Notes
             });
 
@@ -242,7 +242,7 @@ namespace Forto.Application.Abstractions.Services.Ops.Stock.StockMovement
                 UnitCostSnapshot = unitCostForAdjust,
                 TotalCost = diff * unitCostForAdjust, // سالب لو diff سالب
                 OccurredAt = occurred,
-                RecordedByEmployeeId = request.CashierId,
+                //RecordedByEmployeeId = request.CashierId,
                 Notes = request.Notes
             });
 

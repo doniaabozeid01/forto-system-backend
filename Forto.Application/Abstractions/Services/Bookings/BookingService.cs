@@ -2013,7 +2013,7 @@ namespace Forto.Application.Abstractions.Services.Bookings
                         OccurredAt = occurredAt,
                         BookingId = booking.Id,
                         BookingItemId = item.Id,
-                        RecordedByEmployeeId = employeeId, // ✅ العامل اللي نفّذ (للتقارير)
+                        //RecordedByEmployeeId = employeeId, // ✅ العامل اللي نفّذ (للتقارير)
                         Notes = $"Completed by cashier {cashierId}"
                     });
                 }

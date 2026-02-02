@@ -211,7 +211,7 @@ namespace Forto.Application.Abstractions.Services.Bookings.Cashier
                             OccurredAt = now,
                             BookingId = booking.Id,
                             BookingItemId = item.Id,
-                            RecordedByEmployeeId = item.AssignedEmployeeId ?? cashierId,
+                            //RecordedByEmployeeId = item.AssignedEmployeeId ?? cashierId,
                             Notes = $"Completed by cashier {cashierId}"
                         });
                     }
