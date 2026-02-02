@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Text;
@@ -8,10 +8,11 @@ namespace Forto.Domain.Enum
 {
     public enum MaterialMovementType
     {
-        In = 1,        // Stock IN
-        Consume = 2,   // Completed service consumption
-        Waste = 3,     // Cancel after start / damaged
-        Adjust = 4     // Inventory count adjustment
+        In = 1,           // Stock IN
+        Consume = 2,      // Material consumption (completed or cancelled)
+        Waste = 3,        // Cancel after start / damaged
+        Adjust = 4,       // Inventory count adjustment
+        ServiceCharge = 5 // سعر الخدمة الكامل (خدمة مكتملة) - مصدر للفاتورة
     }
 
 }

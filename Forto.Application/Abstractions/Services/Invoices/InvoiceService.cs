@@ -3397,12 +3397,6 @@ namespace Forto.Application.Abstractions.Services.Invoices
                 return Map(existing);
             }
 
-            var items = await itemRepo.FindAsync(i => i.BookingId == bookingId && i.Status != BookingItemStatus.Cancelled);
-
-            var serviceIds = items.Select(i => i.ServiceId).Distinct().ToList();
-            var services = serviceIds.Count == 0 ? new List<Service>() : await serviceRepo.FindAsync(s => serviceIds.Contains(s.Id));
-            var serviceMap = services.ToDictionary(s => s.Id, s => s.Name);
-
             // create invoice
             var client = await clientRepo.GetByIdAsync(booking.ClientId);
 
@@ -3425,39 +3419,17 @@ namespace Forto.Application.Abstractions.Services.Invoices
             invoice.InvoiceNumber = $"for-{DateTime.UtcNow.Year}-{invoice.Id:D3}";
             invRepo.Update(invoice);
 
-            // build SERVICE lines + calculate subTotal in memory (before save)
-            var createdLines = new List<InvoiceLine>();
-            decimal subTotal = 0m;
-
-            foreach (var it in items)
-            {
-                serviceMap.TryGetValue(it.ServiceId, out var name);
-
-                var lineTotal = it.UnitPrice + it.MaterialAdjustment;
-                if (lineTotal < 0) lineTotal = 0;
-
-                var line = new InvoiceLine
-                {
-                    InvoiceId = invoice.Id,
-                    LineType = InvoiceLineType.Service,
-                    BookingItemId = it.Id,
-                    Description = $"Service: {(string.IsNullOrWhiteSpace(name) ? "Service" : name)}",
-                    Qty = 1,
-                    UnitPrice = it.UnitPrice,
-                    Total = lineTotal
-                };
-
-                await lineRepo.AddAsync(line);
-                createdLines.Add(line);
-                subTotal += lineTotal;
-            }
-
-            RecalcInvoiceTotals(invoice, subTotal);
-            invRepo.Update(invoice);
-
+            // build invoice lines from movements (مصدر الفاتورة)
+            await BuildInvoiceLinesFromMovementsAsync(invoice.Id, bookingId);
             await _uow.SaveChangesAsync();
 
-            invoice.Lines = createdLines;
+            var lines = await lineRepo.FindAsync(l => l.InvoiceId == invoice.Id);
+            var subTotal = lines.Sum(l => l.Total);
+            RecalcInvoiceTotals(invoice, subTotal);
+            invRepo.Update(invoice);
+            await _uow.SaveChangesAsync();
+
+            invoice.Lines = lines.ToList();
             return Map(invoice);
         }
 
@@ -3473,8 +3445,6 @@ namespace Forto.Application.Abstractions.Services.Invoices
         {
             var invRepo = _uow.Repository<Invoice>();
             var lineRepo = _uow.Repository<InvoiceLine>();
-            var itemRepo = _uow.Repository<BookingItem>();
-            var serviceRepo = _uow.Repository<Service>();
 
             var inv = await invRepo.GetByIdAsync(invoiceId);
             if (inv == null) return;
@@ -3482,48 +3452,80 @@ namespace Forto.Application.Abstractions.Services.Invoices
             if (inv.Status == InvoiceStatus.Paid)
                 throw new BusinessException("Cannot change invoice after payment (refund flow needed)", 409);
 
-            // 1) delete service lines (by LineType AND Description for legacy lines with LineType=0)
+            // delete service + materials-used lines (keep Product/Gift)
             var existingLines = await lineRepo.FindAsync(l => l.InvoiceId == invoiceId);
             foreach (var l in existingLines)
             {
-                var isServiceLine = l.LineType == InvoiceLineType.Service ||
-                    ((l.Description ?? "").Trim().StartsWith("Service:", StringComparison.OrdinalIgnoreCase));
-                if (isServiceLine)
+                var isBillable = l.LineType == InvoiceLineType.Service || l.LineType == InvoiceLineType.MaterialsUsed ||
+                    ((l.Description ?? "").Trim().StartsWith("Service:", StringComparison.OrdinalIgnoreCase)) ||
+                    ((l.Description ?? "").Trim().StartsWith("Materials used", StringComparison.OrdinalIgnoreCase));
+                if (isBillable)
                     lineRepo.Delete(l);
             }
 
-            // 2) rebuild service lines from booking items not cancelled
-            var items = await itemRepo.FindAsync(i => i.BookingId == bookingId && i.Status != BookingItemStatus.Cancelled);
+            await _uow.SaveChangesAsync();
+
+            // rebuild from movements
+            await BuildInvoiceLinesFromMovementsAsync(invoiceId, bookingId);
+
+            var allLinesAfter = await lineRepo.FindAsync(l => l.InvoiceId == invoiceId);
+            var subTotal = allLinesAfter.Sum(l => l.Total);
+            RecalcInvoiceTotals(inv, subTotal);
+            invRepo.Update(inv);
+        }
+
+        /// <summary>
+        /// بناء بنود الفاتورة من الـ movements: ServiceCharge (خدمة مكتملة) + Consume مع TotalCharge (خدمة ملغاة نشطة).
+        /// </summary>
+        private async Task BuildInvoiceLinesFromMovementsAsync(int invoiceId, int bookingId)
+        {
+            var movementRepo = _uow.Repository<MaterialMovement>();
+            var lineRepo = _uow.Repository<InvoiceLine>();
+            var itemRepo = _uow.Repository<BookingItem>();
+            var serviceRepo = _uow.Repository<Service>();
+
+            var movements = await movementRepo.FindAsync(m =>
+                m.BookingId == bookingId && m.TotalCharge.HasValue && m.TotalCharge > 0);
+
+            var bookingItemIds = movements.Select(m => m.BookingItemId).Where(id => id.HasValue).Select(id => id!.Value).Distinct().ToList();
+            var items = bookingItemIds.Count == 0 ? new List<BookingItem>() : (await itemRepo.FindAsync(i => bookingItemIds.Contains(i.Id))).ToList();
+            var itemMap = items.ToDictionary(i => i.Id, i => i);
 
             var serviceIds = items.Select(i => i.ServiceId).Distinct().ToList();
             var services = serviceIds.Count == 0 ? new List<Service>() : await serviceRepo.FindAsync(s => serviceIds.Contains(s.Id));
-            var map = services.ToDictionary(s => s.Id, s => s.Name);
+            var serviceMap = services.ToDictionary(s => s.Id, s => s.Name);
 
-            foreach (var it in items)
+            foreach (var m in movements.OrderBy(x => x.OccurredAt))
             {
-                map.TryGetValue(it.ServiceId, out var name);
+                var charge = m.TotalCharge!.Value;
+                string desc;
+                var lineType = InvoiceLineType.Service;
 
-                var lineTotal = it.UnitPrice + it.MaterialAdjustment;
-                if (lineTotal < 0) lineTotal = 0;
+                if (m.MovementType == MaterialMovementType.ServiceCharge)
+                {
+                    itemMap.TryGetValue(m.BookingItemId ?? 0, out var item);
+                    serviceMap.TryGetValue(item?.ServiceId ?? 0, out var name);
+                    desc = $"Service: {(string.IsNullOrWhiteSpace(name) ? "Service" : name)}";
+                }
+                else // Consume - مواد خدمة ملغاة
+                {
+                    itemMap.TryGetValue(m.BookingItemId ?? 0, out var item);
+                    serviceMap.TryGetValue(item?.ServiceId ?? 0, out var name);
+                    desc = $"Materials used (cancelled) - {(string.IsNullOrWhiteSpace(name) ? "Service" : name)}";
+                    lineType = InvoiceLineType.MaterialsUsed;
+                }
 
                 await lineRepo.AddAsync(new InvoiceLine
                 {
                     InvoiceId = invoiceId,
-                    LineType = InvoiceLineType.Service,
-                    BookingItemId = it.Id,
-                    Description = $"Service: {(string.IsNullOrWhiteSpace(name) ? "Service" : name)}",
+                    LineType = lineType,
+                    BookingItemId = m.BookingItemId,
+                    Description = desc,
                     Qty = 1,
-                    UnitPrice = it.UnitPrice,
-                    Total = lineTotal
+                    UnitPrice = charge,
+                    Total = charge
                 });
             }
-
-            // 3) totals from ALL lines
-            var allLinesAfter = await lineRepo.FindAsync(l => l.InvoiceId == invoiceId);
-            var subTotal = allLinesAfter.Sum(l => l.Total);
-
-            RecalcInvoiceTotals(inv, subTotal);
-            invRepo.Update(inv);
         }
 
 

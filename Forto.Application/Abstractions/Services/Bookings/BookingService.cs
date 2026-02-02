@@ -1,4 +1,4 @@
-﻿using Forto.Api.Common;
+using Forto.Api.Common;
 using Forto.Application.Abstractions.Repositories;
 using Forto.Application.DTOs.Bookings;
 using Forto.Domain.Entities.Bookings;
@@ -2013,13 +2013,31 @@ namespace Forto.Application.Abstractions.Services.Bookings
                         OccurredAt = occurredAt,
                         BookingId = booking.Id,
                         BookingItemId = item.Id,
-                        //RecordedByEmployeeId = employeeId, // ✅ العامل اللي نفّذ (للتقارير)
                         Notes = $"Completed by cashier {cashierId}"
                     });
                 }
             }
 
             item.MaterialAdjustment = usages.Sum(u => u.ExtraCharge);
+
+            // سعر الخدمة للفاتورة
+            var serviceCharge = item.UnitPrice + item.MaterialAdjustment;
+            if (serviceCharge < 0) serviceCharge = 0;
+            await movementRepo.AddAsync(new MaterialMovement
+            {
+                BranchId = branchId,
+                MaterialId = null,
+                MovementType = MaterialMovementType.ServiceCharge,
+                Qty = 1,
+                UnitCostSnapshot = 0,
+                TotalCost = 0,
+                UnitCharge = serviceCharge,
+                TotalCharge = serviceCharge,
+                OccurredAt = occurredAt,
+                BookingId = booking.Id,
+                BookingItemId = item.Id,
+                Notes = "Service completed - charge"
+            });
             item.Status = BookingItemStatus.Done;
             item.CompletedAt = occurredAt;
             itemRepo.Update(item);

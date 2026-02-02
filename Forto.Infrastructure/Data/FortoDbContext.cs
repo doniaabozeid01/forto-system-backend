@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Reflection.Emit;
@@ -386,6 +386,14 @@ namespace Forto.Infrastructure.Data
             modelBuilder.Entity<MaterialMovement>()
                 .Property(x => x.TotalCost)
                 .HasPrecision(18, 3);
+
+            modelBuilder.Entity<MaterialMovement>()
+                .Property(x => x.UnitCharge)
+                .HasPrecision(18, 2);
+
+            modelBuilder.Entity<MaterialMovement>()
+                .Property(x => x.TotalCharge)
+                .HasPrecision(18, 2);
 
             modelBuilder.Entity<MaterialMovement>()
                 .HasIndex(x => new { x.BranchId, x.OccurredAt });

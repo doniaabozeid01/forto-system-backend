@@ -1255,7 +1255,8 @@ namespace Forto.Application.Abstractions.Services.Bookings.Cashier
                 u.ExtraCharge = 0;
                 usageRepo.Update(u);
 
-                // movement consume
+                // movement consume - بسعر البيع للفاتورة
+                var materialCharge = actualUsed * u.UnitCharge;
                 await movementRepo.AddAsync(new MaterialMovement
                 {
                     BranchId = booking.BranchId,
@@ -1264,10 +1265,11 @@ namespace Forto.Application.Abstractions.Services.Bookings.Cashier
                     Qty = actualUsed,
                     UnitCostSnapshot = u.UnitCost,
                     TotalCost = actualUsed * u.UnitCost,
+                    UnitCharge = u.UnitCharge,
+                    TotalCharge = materialCharge,
                     OccurredAt = now,
                     BookingId = booking.Id,
                     BookingItemId = item.Id,
-                    //RecordedByEmployeeId = request.CashierId,
                     Notes = "Consumed on cancel"
                 });
             }
@@ -1277,23 +1279,7 @@ namespace Forto.Application.Abstractions.Services.Bookings.Cashier
             item.MaterialAdjustment = 0;
             itemRepo.Update(item);
 
-            // add invoice line for materials used ONLY (no service price)
-            if (invoice != null && materialsCharge > 0)
-            {
-                var svc = await serviceRepo.GetByIdAsync(item.ServiceId);
-                var serviceName = svc?.Name ?? "Service";
-
-                await lineRepo.AddAsync(new InvoiceLine
-                {
-                    InvoiceId = invoice.Id,
-                    LineType = InvoiceLineType.MaterialsUsed,
-                    BookingItemId = item.Id, // link to cancelled item
-                    Description = $"Materials used (cancelled) - {serviceName}",
-                    Qty = 1,
-                    UnitPrice = materialsCharge,
-                    Total = materialsCharge
-                });
-            }
+            // الفاتورة تُبنى من الـ movements (TotalCharge) عند الـ Complete
 
             // ✅ Save all changes FIRST
             await _uow.SaveChangesAsync();

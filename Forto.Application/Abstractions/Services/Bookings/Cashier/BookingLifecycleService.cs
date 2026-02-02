@@ -1,4 +1,4 @@
-﻿using Forto.Api.Common;
+using Forto.Api.Common;
 using Forto.Application.Abstractions.Repositories;
 using Forto.Application.Abstractions.Services.Invoices;
 using Forto.Application.DTOs.Bookings;
@@ -221,6 +221,26 @@ namespace Forto.Application.Abstractions.Services.Bookings.Cashier
                 item.Status = BookingItemStatus.Done;
                 item.CompletedAt = now;
                 itemRepo.Update(item);
+
+                // سعر الخدمة للفاتورة - movement من نوع ServiceCharge
+                var serviceCharge = item.UnitPrice + item.MaterialAdjustment;
+                if (serviceCharge < 0) serviceCharge = 0;
+
+                await movementRepo.AddAsync(new MaterialMovement
+                {
+                    BranchId = booking.BranchId,
+                    MaterialId = null,
+                    MovementType = MaterialMovementType.ServiceCharge,
+                    Qty = 1,
+                    UnitCostSnapshot = 0,
+                    TotalCost = 0,
+                    UnitCharge = serviceCharge,
+                    TotalCharge = serviceCharge,
+                    OccurredAt = now,
+                    BookingId = booking.Id,
+                    BookingItemId = item.Id,
+                    Notes = $"Service completed - charge"
+                });
             }
 
             booking.Status = BookingStatus.Completed;

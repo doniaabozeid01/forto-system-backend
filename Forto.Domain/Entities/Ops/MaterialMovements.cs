@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Text;
@@ -13,19 +13,31 @@ namespace Forto.Domain.Entities.Ops
         public int BranchId { get; set; }
         public Branch Branch { get; set; } = null!;
 
-        public int MaterialId { get; set; }
-        public Material Material { get; set; } = null!;
+        public int? MaterialId { get; set; }             // null للـ ServiceCharge
+        public Material? Material { get; set; }
 
         public MaterialMovementType MovementType { get; set; }
 
         public decimal Qty { get; set; }                 // + أو - حسب النوع (Adjust ممكن بالسالب)
         public decimal UnitCostSnapshot { get; set; }    // تكلفة الوحدة وقت الحركة
-        public decimal TotalCost { get; set; }           // Qty * UnitCostSnapshot (خليها بالسالب لو Qty سالب)
+        public decimal TotalCost { get; set; }           // Qty * UnitCostSnapshot (للجرد)
 
-        public DateTime OccurredAt { get; set; }         // ✅ اللي هنفلتر عليه
+        /// <summary>
+        /// سعر بيع الوحدة - ما يدفعه العميل.
+        /// Consume (خدمة مكتملة): لا يُستخدم هنا، نستخدم ServiceCharge بدلاً منه.
+        /// Consume (خدمة ملغاة): سعر بيع الخامات المستخدمة.
+        /// </summary>
+        public decimal? UnitCharge { get; set; }
+        /// <summary>
+        /// إجمالي ما يدفعه العميل (Qty * UnitCharge أو سعر الخدمة للـ ServiceCharge).
+        /// مصدر الفاتورة - نجمع من هنا.
+        /// </summary>
+        public decimal? TotalCharge { get; set; }
 
-        public int? BookingId { get; set; }              // اختياري
-        public int? BookingItemId { get; set; }          // ✅ مهم للـ Waste/Consume
+        public DateTime OccurredAt { get; set; }
+
+        public int? BookingId { get; set; }
+        public int? BookingItemId { get; set; }
 
         public string? Notes { get; set; }
     }
