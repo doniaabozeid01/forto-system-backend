@@ -60,12 +60,6 @@ namespace Forto.Api.Controllers
 
 
 
-
-
-
-
-
-
         // Admin
         [HttpPost("{bookingId:int}/complete")]
         public async Task<IActionResult> ManualComplete(int bookingId, [FromBody] CashierActionRequest request)
@@ -94,11 +88,6 @@ namespace Forto.Api.Controllers
             var data = await _adminService.AssignEmployeesAsync(bookingId, request);
             return OkResponse(data, "Employees assigned");
         }
-
-
-
-
-
 
 
 

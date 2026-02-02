@@ -1,4 +1,4 @@
-﻿using Forto.Application.Abstractions.Services.Employees;
+using Forto.Application.Abstractions.Services.Employees;
 using Forto.Application.DTOs.Catalog.Recipes;
 using Forto.Application.DTOs.Employees;
 using Forto.Domain.Entities.Catalog;
@@ -29,6 +29,13 @@ namespace Forto.Api.Controllers
         public async Task<IActionResult> GetAll()
         {
             var data = await _employeeService.GetAllAsync();
+            return OkResponse(data);
+        }
+
+        [HttpGet("supervisors")]
+        public async Task<IActionResult> GetSupervisors()
+        {
+            var data = await _employeeService.GetSupervisorsAsync();
             return OkResponse(data);
         }
 

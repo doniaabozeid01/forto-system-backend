@@ -1,4 +1,4 @@
-﻿using Forto.Domain.Enum;
+using Forto.Domain.Enum;
 using System;
 using System.Collections.Generic;
 using System.Linq;
@@ -21,6 +21,7 @@ namespace Forto.Application.DTOs.Billings
         public InvoiceStatus Status { get; set; }
 
         public int? PaidByEmployeeId { get; set; }
+        public int? SupervisorId { get; set; }
         public DateTime? PaidAt { get; set; }
         public PaymentMethod? PaymentMethod { get; set; }
         public string ClientName { get; set; }

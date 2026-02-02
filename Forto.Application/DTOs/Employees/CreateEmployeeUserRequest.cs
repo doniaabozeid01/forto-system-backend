@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Text;
@@ -14,7 +14,7 @@ namespace Forto.Application.DTOs.Employees
 
         public string Password { get; set; } = "";
 
-        // "washer" / "cashier" / "admin"
+        // "worker" / "cashier" / "supervisor" / "admin" — Auth مسموح لـ cashier, supervisor, admin فقط
         public string Role { get; set; } = "";
     }
 

@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Text;
@@ -13,6 +13,7 @@ namespace Forto.Application.Abstractions.Services.Employees
         Task<EmployeeResponse> CreateAsync(CreateEmployeeRequest request);
         Task<EmployeeResponse?> GetByIdAsync(int id);
         Task<IReadOnlyList<EmployeeResponse>> GetAllAsync();
+        Task<IReadOnlyList<EmployeeResponse>> GetSupervisorsAsync();
         Task<EmployeeResponse?> UpdateAsync(int id, UpdateEmployeeRequest request);
         Task<bool> DeleteAsync(int id);
         Task<EmployeeResponse> CreateEmployeeUserAsync(CreateEmployeeUserRequest req);

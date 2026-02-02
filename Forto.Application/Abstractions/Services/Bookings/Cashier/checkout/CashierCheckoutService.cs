@@ -15,6 +15,7 @@ using System.Text;
 using System.Threading.Tasks;
 using Forto.Domain.Entities.Bookings;
 using Forto.Domain.Entities.Clients;
+using Forto.Domain.Entities.Employees;
 
 namespace Forto.Application.Abstractions.Services.Bookings.Cashier.checkout
 {
@@ -295,6 +296,10 @@ namespace Forto.Application.Abstractions.Services.Bookings.Cashier.checkout
         // .. . .. //
         public async Task<InvoiceResponse> CheckoutNowAsync(CashierCheckoutRequest request)
         {
+            await RequireCashierAsync(request.CashierId);
+            if (request.SupervisorId.HasValue)
+                await RequireSupervisorAsync(request.SupervisorId.Value);
+
             // 1) QuickCreate booking (convert ServiceAssignments types)
             var quickCreate = new QuickCreateBookingRequest
             {
@@ -356,7 +361,7 @@ namespace Forto.Application.Abstractions.Services.Bookings.Cashier.checkout
             if (invoice == null)
                 throw new BusinessException("Invoice not found after completion", 404);
 
-            // ✅ Fix: store customer snapshot on invoice (name/phone) for booking invoices
+            // ✅ Fix: store customer snapshot + المشرف على الفاتورة
             var bk = await bookingRepo.GetByIdAsync(booking.Id);
             if (bk != null)
             {
@@ -366,9 +371,11 @@ namespace Forto.Application.Abstractions.Services.Bookings.Cashier.checkout
                     invoice.ClientId = cl.Id;
                     invoice.CustomerName = string.IsNullOrWhiteSpace(invoice.CustomerName) ? cl.FullName : invoice.CustomerName;
                     invoice.CustomerPhone = string.IsNullOrWhiteSpace(invoice.CustomerPhone) ? cl.PhoneNumber : invoice.CustomerPhone;
-                    invRepo.Update(invoice);
                 }
             }
+            if (request.SupervisorId.HasValue)
+                invoice.SupervisorId = request.SupervisorId;
+            invRepo.Update(invoice);
 
             // 5) Add products to same invoice (optional) + recalc totals from ALL lines
             if (request.Products != null && request.Products.Count > 0)
@@ -404,6 +411,28 @@ namespace Forto.Application.Abstractions.Services.Bookings.Cashier.checkout
 
 
         // ----------------- helpers ----------------- //
+        private async Task RequireCashierAsync(int cashierId)
+        {
+            var empRepo = _uow.Repository<Employee>();
+            var emp = await empRepo.GetByIdAsync(cashierId);
+            if (emp == null || !emp.IsActive)
+                throw new BusinessException("Cashier not found", 404);
+            if (emp.Role != EmployeeRole.Cashier &&
+                emp.Role != EmployeeRole.Supervisor &&
+                emp.Role != EmployeeRole.Admin)
+                throw new BusinessException("Not allowed", 403);
+        }
+
+        private async Task RequireSupervisorAsync(int supervisorId)
+        {
+            var empRepo = _uow.Repository<Employee>();
+            var emp = await empRepo.GetByIdAsync(supervisorId);
+            if (emp == null || !emp.IsActive)
+                throw new BusinessException("Supervisor not found", 404);
+            if (emp.Role != EmployeeRole.Supervisor)
+                throw new BusinessException("Employee is not a supervisor", 403);
+        }
+
         private class PosProductItemDto
         {
             public int ProductId { get; set; }
@@ -556,6 +585,7 @@ namespace Forto.Application.Abstractions.Services.Bookings.Cashier.checkout
                 PaymentMethod = inv.PaymentMethod,
                 PaidAt = inv.PaidAt,
                 PaidByEmployeeId = inv.PaidByEmployeeId,
+                SupervisorId = inv.SupervisorId,
                 Lines = inv.Lines?.Select(l => new InvoiceLineResponse
                 {
                     Id = l.Id,

@@ -1,4 +1,4 @@
-﻿using Forto.Domain.Enum;
+using Forto.Domain.Enum;
 using System;
 using System.Collections.Generic;
 using System.Linq;
@@ -11,6 +11,8 @@ namespace Forto.Application.DTOs.Bookings.cashier.checkout
     {
         public int BranchId { get; set; }
         public int CashierId { get; set; }
+        /// <summary>معرف المشرف (اختياري).</summary>
+        public int? SupervisorId { get; set; }
 
         public DateTime ScheduledStart { get; set; } // usually now rounded to hour
 

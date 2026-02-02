@@ -1,4 +1,4 @@
-﻿using Forto.Domain.Entities.Bookings;
+using Forto.Domain.Entities.Bookings;
 using Forto.Domain.Entities.Clients;
 using Forto.Domain.Entities.Ops;
 using Forto.Domain.Enum;
@@ -27,6 +27,7 @@ namespace Forto.Domain.Entities.Billings
         public InvoiceStatus Status { get; set; } = InvoiceStatus.Unpaid;
 
         public int? PaidByEmployeeId { get; set; }   // cashier employee id
+        public int? SupervisorId { get; set; }      // مشرف الفاتورة (من الـ checkout)
         public DateTime? PaidAt { get; set; }
         public PaymentMethod? PaymentMethod { get; set; }
 

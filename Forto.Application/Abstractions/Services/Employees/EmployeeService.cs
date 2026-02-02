@@ -63,9 +63,9 @@ namespace Forto.Application.Abstractions.Services.Employees
         public async Task<EmployeeResponse> CreateEmployeeUserAsync(CreateEmployeeUserRequest req)
         {
             var role = req.Role.Trim().ToLowerInvariant();
-            var authAllowed = new[] { "cashier", "admin" };
+            var authAllowed = new[] { "cashier", "admin", "supervisor" };
             if (!authAllowed.Contains(role))
-                throw new BusinessException("Auth (login) is only for Cashier or Admin. For Worker use Create employee without user.", 400);
+                throw new BusinessException("Auth (login) is only for Cashier, Supervisor or Admin. For Worker use Create employee without user.", 400);
 
             var phone = req.PhoneNumber.Trim();
 
@@ -88,6 +88,7 @@ namespace Forto.Application.Abstractions.Services.Employees
                 IsActive = true,
                 Role = role == "worker" ? Domain.Enum.EmployeeRole.Worker :
                        role == "cashier" ? Domain.Enum.EmployeeRole.Cashier :
+                       role == "supervisor" ? Domain.Enum.EmployeeRole.Supervisor :
                        Domain.Enum.EmployeeRole.Admin
             };
 
@@ -149,6 +150,13 @@ namespace Forto.Application.Abstractions.Services.Employees
         {
             var employees = await _uow.Repository<Employee>().GetAllAsync();
             return employees.Select(Map).ToList();
+        }
+
+        public async Task<IReadOnlyList<EmployeeResponse>> GetSupervisorsAsync()
+        {
+            var repo = _uow.Repository<Employee>();
+            var supervisors = await repo.FindAsync(e => e.Role == Domain.Enum.EmployeeRole.Supervisor && e.IsActive);
+            return supervisors.Select(Map).ToList();
         }
 
         public async Task<EmployeeResponse?> UpdateAsync(int id, UpdateEmployeeRequest request)
