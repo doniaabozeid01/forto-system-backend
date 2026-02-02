@@ -15,17 +15,17 @@ namespace Forto.Application.Abstractions.Services.Bookings
         //Task<AvailableSlotsResponse> GetAvailableSlotsAsync(int branchId, DateOnly date, int carId, List<int> serviceIds);
 
         Task<BookingResponse> CreateAsync(CreateBookingRequest request);
+        Task<BookingResponse> CheckoutCreateAsync(CreateBookingRequest request);
         Task<BookingResponse?> GetByIdAsync(int bookingId);
-
         //Task<BookingItemResponse> StartItemAsync(int itemId, int employeeId);
         //Task<BookingItemResponse> CompleteItemAsync(int itemId, int employeeId);
 
-        Task<BookingResponse> QuickCreateAsync(QuickCreateBookingRequest request);
+        //Task<BookingResponse> QuickCreateAsync(QuickCreateBookingRequest request);
+        Task<BookingResponse> QuickCreateAsync(QuickCreateBookingRequest request, bool quickCHeckout);
         Task<AvailableSlotsResponse> GetAvailableSlotsAsync(
-    int branchId,
-    DateOnly date,
-    List<int> serviceIds
-);
+        int branchId,
+        DateOnly date,
+        List<int> serviceIds);
 
         Task<BookingItemResponse> StartItemByCashierAsync(int itemId, int cashierId);
         Task<BookingItemResponse> CompleteItemByCashierAsync(int itemId, int cashierId);

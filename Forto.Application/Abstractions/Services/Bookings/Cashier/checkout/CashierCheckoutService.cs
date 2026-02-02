@@ -1,4 +1,4 @@
-﻿using Forto.Api.Common;
+using Forto.Api.Common;
 using Forto.Application.Abstractions.Repositories;
 using Forto.Application.Abstractions.Services.Invoices;
 using Forto.Application.DTOs.Billings;
@@ -292,7 +292,7 @@ namespace Forto.Application.Abstractions.Services.Bookings.Cashier.checkout
 
 
 
-
+        // .. . .. //
         public async Task<InvoiceResponse> CheckoutNowAsync(CashierCheckoutRequest request)
         {
             // 1) QuickCreate booking (convert ServiceAssignments types)
@@ -333,36 +333,37 @@ namespace Forto.Application.Abstractions.Services.Bookings.Cashier.checkout
                     .ToList()
             };
 
-            var booking = await _bookingService.QuickCreateAsync(quickCreate);
+            var booking = await _bookingService.QuickCreateAsync(quickCreate, true);
 
             // 2) Start booking (requires all items assigned)
             await _lifecycle.StartBookingAsync(booking.Id, request.CashierId);
 
-            // 3) Complete booking
+            // 3) Complete booking (يُنشئ الفاتورة داخلياً عبر EnsureInvoiceForBookingAsync)
             await _lifecycle.CompleteBookingAsync(booking.Id, request.CashierId);
 
-            // 4) Ensure invoice (Unpaid) - services only
-            var invResp = await _invoiceService.EnsureInvoiceForBookingAsync(booking.Id);
-
-            // ✅ IMPORTANT: load invoice entity to update customer snapshot + totals later
+            // 4) نكتفي بالفاتورة اللي اتعملت في Complete - نجيبها متتبعة عشان الـ Update ما يطلعش duplicate tracking
             var invRepo = _uow.Repository<Invoice>();
             var lineRepo = _uow.Repository<InvoiceLine>();
             var bookingRepo = _uow.Repository<Booking>();
             var clientRepo = _uow.Repository<Client>();
 
-            var invoice = await invRepo.GetByIdAsync(invResp.Id);
+            var existingInv = (await invRepo.FindAsync(x => x.BookingId == booking.Id)).FirstOrDefault();
+            if (existingInv == null)
+                throw new BusinessException("Invoice not found after completion", 404);
+
+            // حمّل الفاتورة متتبعة (GetByIdAsync بدون AsNoTracking) عشان نقدّر نعدّلها ونعمل Update
+            var invoice = await invRepo.GetByIdAsync(existingInv.Id);
             if (invoice == null)
-                throw new BusinessException("Invoice not found after creation", 404);
+                throw new BusinessException("Invoice not found after completion", 404);
 
             // ✅ Fix: store customer snapshot on invoice (name/phone) for booking invoices
-            // we take it from booking.ClientId
             var bk = await bookingRepo.GetByIdAsync(booking.Id);
             if (bk != null)
             {
                 var cl = await clientRepo.GetByIdAsync(bk.ClientId);
                 if (cl != null)
                 {
-                    invoice.ClientId = cl.Id; // if invoice has ClientId nullable
+                    invoice.ClientId = cl.Id;
                     invoice.CustomerName = string.IsNullOrWhiteSpace(invoice.CustomerName) ? cl.FullName : invoice.CustomerName;
                     invoice.CustomerPhone = string.IsNullOrWhiteSpace(invoice.CustomerPhone) ? cl.PhoneNumber : invoice.CustomerPhone;
                     invRepo.Update(invoice);
@@ -398,8 +399,11 @@ namespace Forto.Application.Abstractions.Services.Bookings.Cashier.checkout
             return MapInvoice(fresh);
         }
 
-        // ----------------- helpers -----------------
 
+        
+
+
+        // ----------------- helpers ----------------- //
         private class PosProductItemDto
         {
             public int ProductId { get; set; }

@@ -3368,7 +3368,7 @@ namespace Forto.Application.Abstractions.Services.Invoices
 
 
 
-
+        // error in checkout
         public async Task<InvoiceResponse> EnsureInvoiceForBookingAsync(int bookingId)
         {
             var bookingRepo = _uow.Repository<Booking>();
@@ -3440,7 +3440,7 @@ namespace Forto.Application.Abstractions.Services.Invoices
 
 
 
-
+        // error in quick checkout
         private async Task RebuildServiceLinesForInvoiceAsync(int invoiceId, int bookingId)
         {
             var invRepo = _uow.Repository<Invoice>();
@@ -3453,7 +3453,8 @@ namespace Forto.Application.Abstractions.Services.Invoices
                 throw new BusinessException("Cannot change invoice after payment (refund flow needed)", 409);
 
             // delete service + materials-used lines (keep Product/Gift)
-            var existingLines = await lineRepo.FindAsync(l => l.InvoiceId == invoiceId);
+            // Use FindTrackingAsync so Delete(l) soft-delete is persisted on SaveChanges
+            var existingLines = await lineRepo.FindTrackingAsync(l => l.InvoiceId == invoiceId);
             foreach (var l in existingLines)
             {
                 var isBillable = l.LineType == InvoiceLineType.Service || l.LineType == InvoiceLineType.MaterialsUsed ||

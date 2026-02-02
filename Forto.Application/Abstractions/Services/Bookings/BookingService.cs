@@ -507,6 +507,41 @@ namespace Forto.Application.Abstractions.Services.Bookings
             return result;
         }
 
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
         //public async Task<BookingResponse> CreateAsync(CreateBookingRequest request)
         //{
         //    // Validate branch
@@ -661,10 +696,14 @@ namespace Forto.Application.Abstractions.Services.Bookings
 
             // Capacity check
             var bookingRepo = _uow.Repository<Booking>();
+            //var bookedCount = (await bookingRepo.FindAsync(b =>
+            //    b.BranchId == request.BranchId &&
+            //    b.SlotHourStart == slotHourStart &&
+            //    b.Status != BookingStatus.Cancelled )).Count;
             var bookedCount = (await bookingRepo.FindAsync(b =>
                 b.BranchId == request.BranchId &&
                 b.SlotHourStart == slotHourStart &&
-                b.Status != BookingStatus.Cancelled)).Count;
+                b.Status == BookingStatus.InProgress)).Count;
 
             if (bookedCount >= branch.CapacityPerHour)
                 throw new BusinessException("No capacity available for this hour", 409);
@@ -724,6 +763,141 @@ namespace Forto.Application.Abstractions.Services.Bookings
 
             return Map(booking);
         }
+
+
+
+
+
+
+
+        // ----- Checkout Create Async
+        public async Task<BookingResponse> CheckoutCreateAsync(CreateBookingRequest request)
+        {
+            // Validate branch
+            var branch = await _uow.Repository<Branch>().GetByIdAsync(request.BranchId);
+            if (branch == null || !branch.IsActive)
+                throw new BusinessException("Branch not found", 404);
+
+            // Validate client + car
+            var client = await _uow.Repository<Client>().GetByIdAsync(request.ClientId);
+            if (client == null)
+                throw new BusinessException("Client not found", 404);
+
+            var car = await _uow.Repository<Car>().GetByIdAsync(request.CarId);
+            if (car == null || car.ClientId != client.Id)
+                throw new BusinessException("Car not found for this client", 404);
+
+            // ✅ Validate creator (who created this booking)
+            int? createdByEmployeeId = null;
+            int? createdByClientId = null;
+
+            if (request.CreatedByType == BookingCreatedByType.Employee)
+            {
+                if (!request.CreatedByEmployeeId.HasValue)
+                    throw new BusinessException("CreatedByEmployeeId is required", 400);
+
+                var emp = await _uow.Repository<Employee>().GetByIdAsync(request.CreatedByEmployeeId.Value);
+                if (emp == null || !emp.IsActive)
+                    throw new BusinessException("Employee not found", 404);
+
+                // Optional: restrict who can create bookings
+                if (emp.Role != EmployeeRole.Cashier && emp.Role != EmployeeRole.Supervisor && emp.Role != EmployeeRole.Admin)
+                    throw new BusinessException("Employee is not allowed to create bookings", 403);
+
+                createdByEmployeeId = emp.Id;
+                createdByClientId = null;
+            }
+            else if (request.CreatedByType == BookingCreatedByType.Client)
+            {
+                // لو UI مش بيبعت CreatedByClientId، نقدر نعتبره نفس clientId بتاع الحجز
+                // لكن لو تحبي تلزميه ابعتيه، سيبي السطرين دول:
+                createdByClientId = request.CreatedByClientId ?? client.Id;
+                createdByEmployeeId = null;
+
+                // (اختياري) تأكيد إن CreatedByClientId هو نفس العميل بتاع الحجز
+                if (createdByClientId != client.Id)
+                    throw new BusinessException("CreatedByClientId must match booking client", 400);
+            }
+            else
+            {
+                throw new BusinessException("CreatedByType is required", 400);
+            }
+
+            // normalize to hour slot
+            var slotHourStart = new DateTime(
+                request.ScheduledStart.Year, request.ScheduledStart.Month, request.ScheduledStart.Day,
+                request.ScheduledStart.Hour, 0, 0);
+
+            // Enforce hour booking only
+            //if (request.ScheduledStart.Minute != 0 || request.ScheduledStart.Second != 0)
+            //    throw new BusinessException("ScheduledStart must be on the hour (e.g. 14:00)", 400);
+
+            // Capacity check
+            var bookingRepo = _uow.Repository<Booking>();
+            //var bookedCount = (await bookingRepo.FindAsync(b =>
+            //    b.BranchId == request.BranchId &&
+            //    b.SlotHourStart == slotHourStart &&
+            //    b.Status != BookingStatus.Cancelled)).Count;
+
+            //if (bookedCount >= branch.CapacityPerHour)
+            //    throw new BusinessException("No capacity available for this hour", 409);
+
+            var serviceIds = request.ServiceIds.Distinct().ToList();
+            await EnsureRatesExistForBodyType(serviceIds, car.BodyType);
+
+            // Staff check: for each service, at least one qualified employee exists working at this hour
+            //var staffOk = await HasQualifiedStaffForAllServices(slotHourStart, serviceIds);
+            //if (!staffOk)
+            //    throw new BusinessException("No qualified employees available for one or more selected services at this time", 409);
+
+            // Build booking items with snapshots from rates
+            var rateRepo = _uow.Repository<ServiceRate>();
+            var rates = await rateRepo.FindAsync(r => r.IsActive && serviceIds.Contains(r.ServiceId) && r.BodyType == car.BodyType);
+            var rateMap = rates.ToDictionary(r => r.ServiceId, r => r);
+
+            var items = new List<BookingItem>();
+            foreach (var sid in serviceIds)
+            {
+                var rate = rateMap[sid];
+
+                items.Add(new BookingItem
+                {
+                    ServiceId = sid,
+                    BodyType = car.BodyType,
+                    UnitPrice = rate.Price,
+                    DurationMinutes = rate.DurationMinutes,
+                    Status = BookingItemStatus.Pending
+                });
+            }
+
+            var totalPrice = items.Sum(i => i.UnitPrice);
+            var totalDuration = items.Sum(i => i.DurationMinutes);
+
+            var booking = new Booking
+            {
+                BranchId = request.BranchId,
+                ClientId = client.Id,
+                CarId = car.Id,
+                ScheduledStart = request.ScheduledStart,
+                SlotHourStart = slotHourStart,
+                TotalPrice = totalPrice,
+                EstimatedDurationMinutes = totalDuration,
+                Status = BookingStatus.Pending,
+                Notes = request.Notes?.Trim(),
+                Items = items,
+
+                // ✅ creator info stored
+                CreatedByType = request.CreatedByType,
+                CreatedByEmployeeId = createdByEmployeeId,
+                CreatedByClientId = createdByClientId
+            };
+
+            await bookingRepo.AddAsync(booking);
+            await _uow.SaveChangesAsync();
+
+            return Map(booking);
+        }
+
 
 
 
@@ -1396,7 +1570,7 @@ namespace Forto.Application.Abstractions.Services.Bookings
         //    return MapItem(item);
         //}
 
-        public async Task<BookingResponse> QuickCreateAsync(QuickCreateBookingRequest request)
+        public async Task<BookingResponse> QuickCreateAsync(QuickCreateBookingRequest request, bool quickCHeckout)
         {
             // 0) normalize
             var phone = request.Client.PhoneNumber.Trim();
@@ -1467,9 +1641,15 @@ namespace Forto.Application.Abstractions.Services.Bookings
                 CreatedByEmployeeId = request.CreatedByEmployeeId,
                 CreatedByClientId = request.CreatedByType == BookingCreatedByType.Client ? client.Id : request.CreatedByClientId
             };
-
-
-            var bookingResponse = await CreateAsync(create);
+            var bookingResponse = new BookingResponse();
+            if (!quickCHeckout)
+            {
+                bookingResponse = await CreateAsync(create);
+            }
+            else
+            {
+                bookingResponse = await CheckoutCreateAsync(create);
+            }
 
             // 4) assign مباشر لو موجود
             // ✅ assign per service (optional)
@@ -1522,6 +1702,172 @@ namespace Forto.Application.Abstractions.Services.Bookings
             return bookingResponse;
 
         }
+
+
+
+         
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+        //public async Task<BookingResponse> CheckOutQuickCreateAsync(QuickCreateBookingRequest request)
+        //{
+        //    // 0) normalize
+        //    var phone = request.Client.PhoneNumber.Trim();
+        //    var plate = request.Car.PlateNumber.Trim().ToUpperInvariant();
+
+        //    // 1) Get or create client by phone
+        //    var clientRepo = _uow.Repository<Client>();
+        //    var clients = await clientRepo.FindAsync(c => c.PhoneNumber == phone);
+        //    var client = clients.FirstOrDefault();
+
+        //    if (client == null)
+        //    {
+        //        client = new Client
+        //        {
+        //            PhoneNumber = phone,
+        //            FullName = (request.Client.FullName ?? "New Client").Trim(),
+        //            Email = request.Client.Email?.Trim(),
+        //            IsActive = true
+        //        };
+        //        await clientRepo.AddAsync(client);
+        //        await _uow.SaveChangesAsync();
+        //    }
+
+        //    // 2) Get or create car
+        //    var carRepo = _uow.Repository<Car>();
+        //    var cars = await carRepo.FindAsync(c => c.ClientId == client.Id && c.PlateNumber == plate);
+        //    var car = cars.FirstOrDefault();
+
+        //    if (car == null)
+        //    {
+        //        car = new Car
+        //        {
+        //            ClientId = client.Id,
+        //            PlateNumber = plate,
+        //            BodyType = request.Car.BodyType,
+        //            Brand = request.Car.Brand?.Trim(),
+        //            Model = request.Car.Model?.Trim(),
+        //            Color = request.Car.Color?.Trim(),
+        //            Year = request.Car.Year,
+        //            IsDefault = request.Car.IsDefault
+        //        };
+        //        await carRepo.AddAsync(car);
+
+        //        if (request.Car.IsDefault)
+        //        {
+        //            var otherCars = await carRepo.FindAsync(c => c.ClientId == client.Id);
+        //            foreach (var oc in otherCars.Where(x => x.Id != car.Id && x.IsDefault))
+        //            {
+        //                oc.IsDefault = false;
+        //                carRepo.Update(oc);
+        //            }
+        //        }
+
+        //        await _uow.SaveChangesAsync();
+        //    }
+
+        //    // 3) Create booking
+        //    var create = new CreateBookingRequest
+        //    {
+        //        BranchId = request.BranchId,
+        //        ClientId = client.Id,
+        //        CarId = car.Id,
+        //        ScheduledStart = request.ScheduledStart,
+        //        ServiceIds = request.ServiceIds,
+        //        Notes = request.Notes,
+
+        //        CreatedByType = request.CreatedByType,
+        //        CreatedByEmployeeId = request.CreatedByEmployeeId,
+        //        CreatedByClientId = request.CreatedByType == BookingCreatedByType.Client ? client.Id : request.CreatedByClientId
+        //    };
+
+
+        //    var bookingResponse = await CreateAsync(create);
+
+        //    // 4) assign مباشر لو موجود
+        //    // ✅ assign per service (optional)
+        //    if (request.ServiceAssignments != null && request.ServiceAssignments.Count > 0)
+        //    {
+        //        var bookingItemRepo = _uow.Repository<BookingItem>();
+        //        var employeeServiceRepo = _uow.Repository<EmployeeService>();
+
+        //        // serviceId -> employeeId
+        //        var map = request.ServiceAssignments
+        //            .GroupBy(x => x.ServiceId)
+        //            .ToDictionary(g => g.Key, g => g.First().EmployeeId);
+
+        //        // هات كل booking items tracking
+        //        var items = await bookingItemRepo.FindTrackingAsync(i => i.BookingId == bookingResponse.Id);
+
+        //        foreach (var item in items)
+        //        {
+        //            // لو مش معمول assignment للخدمة دي، سيبيها null
+        //            if (!map.TryGetValue(item.ServiceId, out var employeeId))
+        //                continue;
+
+        //            // ✅ شغال في الوقت ده؟
+        //            var isWorking = await _scheduleService.IsEmployeeWorkingAsync(employeeId, request.ScheduledStart);
+        //            if (!isWorking)
+        //                throw new BusinessException($"Employee {employeeId} is not working at this time", 409);
+
+        //            // ✅ مؤهل للخدمة؟
+        //            var qualified = await employeeServiceRepo.AnyAsync(es =>
+        //                es.EmployeeId == employeeId &&
+        //                es.ServiceId == item.ServiceId &&
+        //                es.IsActive);
+
+        //            if (!qualified)
+        //                throw new BusinessException($"Employee {employeeId} is not qualified for service {item.ServiceId}", 409);
+
+        //            // assign
+        //            item.AssignedEmployeeId = employeeId;
+        //            bookingItemRepo.Update(item);
+
+        //            // ✅ عدّل response كمان (عشان يرجع فورًا)
+        //            var respItem = bookingResponse.Items.FirstOrDefault(x => x.Id == item.Id);
+        //            if (respItem != null)
+        //                respItem.AssignedEmployeeId = employeeId;
+        //        }
+
+        //        await _uow.SaveChangesAsync();
+        //    }
+
+        //    return bookingResponse;
+
+        //}
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 
 
         //public async Task<BookingItemResponse> CompleteItemAsync (int itemId, int employeeId)

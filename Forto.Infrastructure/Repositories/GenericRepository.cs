@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Linq.Expressions;
@@ -52,10 +52,10 @@ namespace Forto.Infrastructure.Repositories
 
         public void Delete(T entity)
         {
-            // Soft delete
+            // Soft delete: only mutate; if entity is already tracked, EF will persist on SaveChanges.
             entity.IsDeleted = true;
             entity.UpdatedAt = DateTime.UtcNow;
-            _set.Update(entity);
+            // Do NOT call _set.Update(entity) when entity may already be tracked (e.g. from FindAsync).
 
             // لو عايزة hard delete بدل soft:
             // _set.Remove(entity);
