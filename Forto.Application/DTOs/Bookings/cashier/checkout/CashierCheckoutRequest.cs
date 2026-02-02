@@ -25,6 +25,7 @@ namespace Forto.Application.DTOs.Bookings.cashier.checkout
 
         public List<PosInvoiceItemDto>? Products { get; set; } // optional products on the same invoice
 
+        public int GiftId { get; set; }
         public string? Notes { get; set; }
     }
 

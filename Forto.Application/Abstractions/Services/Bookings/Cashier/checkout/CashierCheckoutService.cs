@@ -293,8 +293,8 @@ namespace Forto.Application.Abstractions.Services.Bookings.Cashier.checkout
 
 
 
-        // .. . .. //
-        public async Task<InvoiceResponse> CheckoutNowAsync(CashierCheckoutRequest request)
+        // .. . .. // 
+        public async Task<InvoiceResponse> CheckoutNowAsync (CashierCheckoutRequest request)
         {
             await RequireCashierAsync(request.CashierId);
             if (request.SupervisorId.HasValue)
@@ -392,6 +392,17 @@ namespace Forto.Application.Abstractions.Services.Bookings.Cashier.checkout
                 // ✅ even لو مفيش منتجات: تأكد totals = sum(lines) + VAT
                 await RecalcInvoiceFromAllLinesAsync(invoice.Id);
             }
+
+            // 5.5) Add gift (optional)
+            if (request.GiftId > 0 )
+            {
+                await AddGiftToInvoiceAsync(
+                    invoice,
+                    request.CashierId,
+                    request.GiftId
+                );
+            }
+
 
             // 6) Pay cash immediately (Paid)
             await PayInvoiceCashAsync(invoice.Id, request.CashierId, DateTime.UtcNow);
@@ -598,6 +609,69 @@ namespace Forto.Application.Abstractions.Services.Bookings.Cashier.checkout
         }
 
 
+        private async Task AddGiftToInvoiceAsync(
+    Invoice invoice,
+    int cashierId,
+    int productId)
+        {
+            var productRepo = _uow.Repository<Product>();
+            var stockRepo = _uow.Repository<BranchProductStock>();
+            var lineRepo = _uow.Repository<InvoiceLine>();
+            var moveRepo = _uow.Repository<ProductMovement>();
+            var invRepo = _uow.Repository<Invoice>();
+
+            var product = await productRepo.GetByIdAsync(productId);
+            if (product == null || !product.IsActive)
+                throw new BusinessException("Gift product not found", 404);
+
+            var stock = (await stockRepo.FindTrackingAsync(s =>
+                s.BranchId == invoice.BranchId &&
+                s.ProductId == productId
+            )).FirstOrDefault();
+
+            if (stock == null)
+                throw new BusinessException("Gift product stock not found in this branch", 409);
+
+            var available = stock.OnHandQty - stock.ReservedQty;
+            if (available < 1)
+                throw new BusinessException("Not enough stock for gift product", 409);
+
+            // ✅ deduct stock
+            stock.OnHandQty -= 1;
+            stockRepo.Update(stock);
+
+            // ✅ add invoice line (FREE)
+            await lineRepo.AddAsync(new InvoiceLine
+            {
+                InvoiceId = invoice.Id,
+                LineType = InvoiceLineType.Gift,
+                Description = $"Gift: {product.Name}",
+                Qty = 1,
+                UnitPrice = 0,
+                Total = 0
+            });
+
+            // ✅ stock movement (GIFT)
+            await moveRepo.AddAsync(new ProductMovement
+            {
+                BranchId = invoice.BranchId??0,
+                ProductId = productId,
+                MovementType = ProductMovementType.Gift,
+                Qty = 1,
+                UnitCostSnapshot = product.CostPerUnit,
+                TotalCost = product.CostPerUnit,
+                OccurredAt = DateTime.UtcNow,
+                InvoiceId = invoice.Id,
+                RecordedByEmployeeId = cashierId,
+                Notes = "Gift given in checkout"
+            });
+
+            // ❗ مهم: نعيد حساب الفاتورة من كل السطور (Services + Products + Gifts)
+            await RecalcInvoiceFromAllLinesAsync(invoice.Id);
+
+            invRepo.Update(invoice);
+            await _uow.SaveChangesAsync();
+        }
 
 
 
