@@ -1,4 +1,4 @@
-﻿using Forto.Application.Abstractions.Services.Dashboard;
+using Forto.Application.Abstractions.Services.Dashboard;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
 
@@ -50,7 +50,16 @@ namespace Forto.Api.Controllers
                 var data = await _service.GetTopEmployeesAsync(branchId, f, t);
                 return OkResponse(data, "OK");
             }
-        
-    }
+
+            /// <summary>كل الموظفين + فواتير (كاشير/مشرف). role: فلتر اختياري. invoicesOnly: true = الواقع على الفواتير فقط (بدون حجوزات).</summary>
+            [HttpGet("employees-with-services")]
+            public async Task<IActionResult> EmployeesWithServices([FromQuery] int branchId, [FromQuery] string from, [FromQuery] string to, [FromQuery] int? role = null)
+            {
+                var f = DateOnly.Parse(from);
+                var t = DateOnly.Parse(to);
+                var data = await _service.GetTopEmployeesWithServicesAsync(branchId, f, t, role);
+                return OkResponse(data, "OK");
+            }
+        }
 
 }

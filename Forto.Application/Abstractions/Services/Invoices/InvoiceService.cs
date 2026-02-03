@@ -3165,10 +3165,10 @@ namespace Forto.Application.Abstractions.Services.Invoices
             }
 
             // ===============================
-            // Order (newest first)
+            // Order (تنازلي بناءً على رقم الفاتورة)
             // ===============================
             invoices = invoices
-                .OrderByDescending(i => i.PaidAt ?? i.CreatedAt)
+                .OrderByDescending(i => i.Id)
                 .ToList();
 
             var totalCount = invoices.Count;
@@ -3294,7 +3294,7 @@ namespace Forto.Application.Abstractions.Services.Invoices
                     ItemsText = itemsText,
                     Lines = lineDtos
                 };
-            }).ToList();
+            }).OrderByDescending(i => i.InvoiceNumber).ToList();
 
             return new InvoiceListResponse
             {

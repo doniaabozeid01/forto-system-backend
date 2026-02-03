@@ -14,6 +14,7 @@ using System.Linq;
 using System.Text;
 using System.Threading.Tasks;
 using Forto.Domain.Entities.Bookings;
+using Forto.Domain.Entities.Catalog;
 using Forto.Domain.Entities.Clients;
 using Forto.Domain.Entities.Employees;
 
@@ -377,7 +378,15 @@ namespace Forto.Application.Abstractions.Services.Bookings.Cashier.checkout
                 invoice.SupervisorId = request.SupervisorId;
             invRepo.Update(invoice);
 
-            // 5) Add products to same invoice (optional) + recalc totals from ALL lines
+            // 5) إضافة الهدايا من الـ request (قبل المنتجات) — بعد الـ Complete والفاتورة جاهزة
+            if (request.Gifts != null && request.Gifts.Count > 0)
+            {
+                await AddGiftsFromCheckoutRequestAsync(invoice.Id, booking.Id, request.Gifts, request.CashierId);
+                await _uow.SaveChangesAsync();
+                await RecalcInvoiceFromAllLinesAsync(invoice.Id);
+            }
+
+            // 6) Add products to same invoice (optional) + recalc totals from ALL lines
             if (request.Products != null && request.Products.Count > 0)
             {
                 var products = request.Products
@@ -393,10 +402,10 @@ namespace Forto.Application.Abstractions.Services.Bookings.Cashier.checkout
                 await RecalcInvoiceFromAllLinesAsync(invoice.Id);
             }
 
-            // 6) Pay cash immediately (Paid)
+            // 7) Pay cash immediately (Paid)
             await PayInvoiceCashAsync(invoice.Id, request.CashierId, DateTime.UtcNow);
 
-            // 7) return fresh invoice + lines
+            // 8) return fresh invoice + lines
             var fresh = await invRepo.GetByIdAsync(invoice.Id);
             if (fresh == null) throw new BusinessException("Invoice not found", 404);
 
@@ -431,6 +440,100 @@ namespace Forto.Application.Abstractions.Services.Bookings.Cashier.checkout
                 throw new BusinessException("Supervisor not found", 404);
             if (emp.Role != EmployeeRole.Supervisor)
                 throw new BusinessException("Employee is not a supervisor", 403);
+        }
+
+        /// <summary>إضافة الهدايا من طلب الـ checkout — المنتج لازم يكون من خيارات الهدايا للخدمات المكتملة.</summary>
+        private async Task AddGiftsFromCheckoutRequestAsync(int invoiceId, int bookingId, List<CashierGiftItemDto> gifts, int cashierId)
+        {
+            if (gifts == null || gifts.Count == 0) return;
+
+            var invRepo = _uow.Repository<Invoice>();
+            var lineRepo = _uow.Repository<InvoiceLine>();
+            var bookingRepo = _uow.Repository<Booking>();
+            var itemRepo = _uow.Repository<BookingItem>();
+            var giftOptRepo = _uow.Repository<ServiceGiftOption>();
+            var redemptionRepo = _uow.Repository<BookingGiftRedemption>();
+            var productRepo = _uow.Repository<Product>();
+            var stockRepo = _uow.Repository<BranchProductStock>();
+            var moveRepo = _uow.Repository<ProductMovement>();
+
+            var invoice = await invRepo.GetByIdAsync(invoiceId);
+            if (invoice == null) throw new BusinessException("Invoice not found", 404);
+            if (invoice.Status != InvoiceStatus.Unpaid)
+                throw new BusinessException("Invoice must be Unpaid to add gifts", 409);
+
+            var booking = await bookingRepo.GetByIdAsync(bookingId);
+            if (booking == null) throw new BusinessException("Booking not found", 404);
+
+            var doneItems = await itemRepo.FindAsync(i => i.BookingId == bookingId && i.Status == BookingItemStatus.Done);
+            var serviceIds = doneItems.Select(i => i.ServiceId).Distinct().ToList();
+            if (serviceIds.Count == 0)
+                throw new BusinessException("No completed services to unlock gifts", 409);
+
+            var branchId = booking.BranchId;
+            var occurredAt = DateTime.UtcNow;
+
+            foreach (var g in gifts)
+            {
+                var isAllowed = await giftOptRepo.AnyAsync(o =>
+                    o.IsActive && o.ProductId == g.ProductId && serviceIds.Contains(o.ServiceId));
+                if (!isAllowed)
+                    throw new BusinessException($"Product {g.ProductId} is not an available gift for this booking", 409);
+
+                var product = await productRepo.GetByIdAsync(g.ProductId);
+                if (product == null || !product.IsActive)
+                    throw new BusinessException($"Product {g.ProductId} not found", 404);
+
+                var stock = (await stockRepo.FindTrackingAsync(s => s.BranchId == branchId && s.ProductId == g.ProductId)).FirstOrDefault();
+                if (stock == null)
+                    throw new BusinessException($"Gift product {g.ProductId} stock not found in this branch", 409);
+                var available = stock.OnHandQty - stock.ReservedQty;
+                if (available < 0) available = 0;
+                if (available < 1)
+                    throw new BusinessException($"Gift product {g.ProductId} out of stock", 409);
+
+                stock.OnHandQty -= 1;
+                stockRepo.Update(stock);
+
+                var invLine = new InvoiceLine
+                {
+                    InvoiceId = invoiceId,
+                    LineType = InvoiceLineType.Gift,
+                    Description = $"Gift: {product.Name}",
+                    Qty = 1,
+                    UnitPrice = 0,
+                    Total = 0
+                };
+                await lineRepo.AddAsync(invLine);
+                await _uow.SaveChangesAsync();
+
+                await moveRepo.AddAsync(new ProductMovement
+                {
+                    BranchId = branchId,
+                    ProductId = product.Id,
+                    MovementType = ProductMovementType.Gift,
+                    Qty = 1,
+                    UnitCostSnapshot = product.CostPerUnit,
+                    TotalCost = product.CostPerUnit,
+                    OccurredAt = occurredAt,
+                    InvoiceId = invoiceId,
+                    BookingId = bookingId,
+                    BookingItemId = null,
+                    RecordedByEmployeeId = cashierId,
+                    Notes = "Gift from checkout"
+                });
+
+                await redemptionRepo.AddAsync(new BookingGiftRedemption
+                {
+                    BookingId = bookingId,
+                    ProductId = product.Id,
+                    InvoiceId = invoiceId,
+                    InvoiceLineId = invLine.Id,
+                    SelectedByCashierId = cashierId,
+                    OccurredAt = occurredAt,
+                    Notes = "Gift from checkout"
+                });
+            }
         }
 
         private class PosProductItemDto

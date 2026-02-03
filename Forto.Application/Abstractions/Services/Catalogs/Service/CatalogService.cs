@@ -1,10 +1,13 @@
-﻿using Forto.Api.Common;
+using Forto.Api.Common;
 using Forto.Application.Abstractions.Repositories;
+using Forto.Application.DTOs.Billings.Gifts;
+using Forto.Application.DTOs.Catalog;
 using Forto.Application.DTOs.Catalog.Services;
 using Forto.Application.DTOs.Employees;
 using Forto.Domain.Entities.Bookings;
 using Forto.Domain.Entities.Catalog;
 using Forto.Domain.Entities.Employees;
+using Forto.Domain.Entities.Inventory;
 using Forto.Domain.Entities.Ops;
 using Forto.Domain.Enum;
 using System;
@@ -460,7 +463,157 @@ namespace Forto.Application.Abstractions.Services.Catalogs.Service
             return resp;
         }
 
+        public async Task<GiftOptionsByServicesResponse> GetGiftOptionsByServiceIdsAsync(IReadOnlyList<int> serviceIds, int? branchId = null)
+        {
+            var resp = new GiftOptionsByServicesResponse
+            {
+                ServiceIds = serviceIds?.ToList() ?? new List<int>(),
+                BranchId = branchId
+            };
+            if (serviceIds == null || serviceIds.Count == 0)
+                return resp;
 
+            var giftOptRepo = _uow.Repository<ServiceGiftOption>();
+            var giftOptions = await giftOptRepo.FindAsync(o => o.IsActive && serviceIds.Contains(o.ServiceId));
+            var productIds = giftOptions.Select(o => o.ProductId).Distinct().ToList();
+            if (productIds.Count == 0)
+                return resp;
 
+            var productRepo = _uow.Repository<Product>();
+            var products = await productRepo.FindAsync(p => productIds.Contains(p.Id) && p.IsActive);
+            var productMap = products.ToDictionary(p => p.Id, p => p);
+
+            var options = new List<GiftOptionDto>();
+            if (branchId.HasValue)
+            {
+                var stockRepo = _uow.Repository<BranchProductStock>();
+                var stocks = await stockRepo.FindAsync(s => s.BranchId == branchId.Value && productIds.Contains(s.ProductId));
+                var stockMap = stocks.ToDictionary(s => s.ProductId, s => s);
+                foreach (var pid in productIds)
+                {
+                    productMap.TryGetValue(pid, out var p);
+                    stockMap.TryGetValue(pid, out var st);
+                    var onHand = st?.OnHandQty ?? 0m;
+                    var reserved = st?.ReservedQty ?? 0m;
+                    var available = onHand - reserved;
+                    if (available < 0) available = 0;
+                    options.Add(new GiftOptionDto
+                    {
+                        ProductId = pid,
+                        ProductName = p?.Name ?? "",
+                        Sku = p?.Sku,
+                        AvailableQty = available
+                    });
+                }
+            }
+            else
+            {
+                foreach (var pid in productIds)
+                {
+                    productMap.TryGetValue(pid, out var p);
+                    options.Add(new GiftOptionDto
+                    {
+                        ProductId = pid,
+                        ProductName = p?.Name ?? "",
+                        Sku = p?.Sku,
+                        AvailableQty = 0
+                    });
+                }
+            }
+
+            resp.Options = options.OrderByDescending(x => x.AvailableQty).ThenBy(x => x.ProductName).ToList();
+            return resp;
+        }
+
+        public async Task<IReadOnlyList<ServiceGiftOptionDto>> GetGiftOptionsForServiceAsync(int serviceId)
+        {
+            var serviceRepo = _uow.Repository<Domain.Entities.Catalog.Service>();
+            var service = await serviceRepo.GetByIdAsync(serviceId);
+            if (service == null)
+                throw new BusinessException("Service not found", 404);
+
+            var giftOptRepo = _uow.Repository<ServiceGiftOption>();
+            var productRepo = _uow.Repository<Product>();
+            var opts = await giftOptRepo.FindAsync(o => o.ServiceId == serviceId);
+            var productIds = opts.Select(o => o.ProductId).Distinct().ToList();
+            var products = productIds.Count == 0 ? new List<Product>() : (await productRepo.FindAsync(p => productIds.Contains(p.Id))).ToList();
+            var productMap = products.ToDictionary(p => p.Id, p => p);
+
+            return opts.Select(o =>
+            {
+                productMap.TryGetValue(o.ProductId, out var p);
+                return new ServiceGiftOptionDto
+                {
+                    Id = o.Id,
+                    ServiceId = o.ServiceId,
+                    ProductId = o.ProductId,
+                    ProductName = p?.Name ?? "",
+                    ProductSku = p?.Sku,
+                    IsActive = o.IsActive
+                };
+            }).OrderBy(x => x.ProductName).ToList();
+        }
+
+        public async Task<IReadOnlyList<ServiceGiftOptionDto>> AddGiftOptionsToServiceAsync(int serviceId, IReadOnlyList<int> productIds)
+        {
+            if (productIds == null || productIds.Count == 0)
+                return new List<ServiceGiftOptionDto>();
+
+            var serviceRepo = _uow.Repository<Domain.Entities.Catalog.Service>();
+            var service = await serviceRepo.GetByIdAsync(serviceId);
+            if (service == null)
+                throw new BusinessException("Service not found", 404);
+
+            var giftOptRepo = _uow.Repository<ServiceGiftOption>();
+            var productRepo = _uow.Repository<Product>();
+            var existing = await giftOptRepo.FindAsync(o => o.ServiceId == serviceId);
+            var existingProductIds = existing.Select(o => o.ProductId).ToHashSet();
+            var distinctIds = productIds.Where(id => id > 0).Distinct().ToList();
+            var result = new List<ServiceGiftOptionDto>();
+
+            foreach (var productId in distinctIds)
+            {
+                if (existingProductIds.Contains(productId))
+                    continue;
+                var product = await productRepo.GetByIdAsync(productId);
+                if (product == null || !product.IsActive)
+                    continue;
+                var entity = new ServiceGiftOption
+                {
+                    ServiceId = serviceId,
+                    ProductId = productId,
+                    IsActive = true
+                };
+                await giftOptRepo.AddAsync(entity);
+                await _uow.SaveChangesAsync();
+                existingProductIds.Add(productId);
+                result.Add(new ServiceGiftOptionDto
+                {
+                    Id = entity.Id,
+                    ServiceId = entity.ServiceId,
+                    ProductId = entity.ProductId,
+                    ProductName = product.Name,
+                    ProductSku = product.Sku,
+                    IsActive = entity.IsActive
+                });
+            }
+
+            return result;
+        }
+
+        public async Task<int> RemoveGiftOptionsFromServiceAsync(int serviceId, IReadOnlyList<int> productIds)
+        {
+            if (productIds == null || productIds.Count == 0)
+                return 0;
+            var giftOptRepo = _uow.Repository<ServiceGiftOption>();
+            var ids = productIds.Where(id => id > 0).Distinct().ToList();
+            var opts = await giftOptRepo.FindTrackingAsync(o => o.ServiceId == serviceId && ids.Contains(o.ProductId));
+            var count = opts.Count;
+            foreach (var opt in opts)
+                giftOptRepo.Delete(opt);
+            if (count > 0)
+                await _uow.SaveChangesAsync();
+            return count;
+        }
     }
 }

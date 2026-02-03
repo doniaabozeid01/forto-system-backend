@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Text;
@@ -16,6 +16,8 @@ namespace Forto.Application.Abstractions.Services.Dashboard
 
         Task<AnalyticsResponse> GetTopEmployeesAsync(int branchId, DateOnly from, DateOnly to);
 
+        /// <summary>كل الموظفين مع تفصيل الخدمات + فواتير ككاشير/مشرف. role: فلتر اختياري. invoicesOnly: لو true نرجع الفواتير فقط (بدون حجوزات/خدمات).</summary>
+        Task<TopEmployeesWithServicesResponse> GetTopEmployeesWithServicesAsync(int branchId, DateOnly from, DateOnly to, int? role = null);
     }
 
 }

@@ -1,4 +1,4 @@
-﻿using Forto.Application.Abstractions.Services.Invoices;
+using Forto.Application.Abstractions.Services.Invoices;
 using Forto.Application.DTOs.Billings;
 using Forto.Application.DTOs.Billings.cashier;
 using Forto.Application.DTOs.Billings.Gifts;
@@ -65,11 +65,27 @@ namespace Forto.Api.Controllers
 
 
 
+        /// <summary>إضافة هدية على فاتورة (بعد الـ Complete/Checkout) — Body: cashierId, productId.</summary>
         [HttpPost("{invoiceId:int}/gift/select")]
         public async Task<IActionResult> SelectGift(int invoiceId, [FromBody] SelectInvoiceGiftRequest request)
         {
             var data = await _service.SelectGiftAsync(invoiceId, request);
             return OkResponse(data, "Gift selected");
+        }
+
+        /// <summary>نفس SelectGift — بس invoiceId جوا الـ body مع productId و cashierId (لو الفرونت حابب يبعت كل حاجة في body واحد).</summary>
+        [HttpPost("gift/add")]
+        public async Task<IActionResult> AddGiftToInvoice([FromBody] AddGiftToInvoiceRequest request)
+        {
+            var req = new SelectInvoiceGiftRequest
+            {
+                CashierId = request.CashierId,
+                ProductId = request.ProductId,
+                OccurredAt = request.OccurredAt,
+                Notes = request.Notes
+            };
+            var data = await _service.SelectGiftAsync(request.InvoiceId, req);
+            return OkResponse(data, "Gift added");
         }
 
 

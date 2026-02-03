@@ -1,8 +1,10 @@
-﻿using Forto.Application.Abstractions.Services.Catalogs.Service;
+using Forto.Application.Abstractions.Services.Catalogs.Service;
 using Forto.Application.DTOs;
 using Forto.Application.DTOs.Catalog.Services;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
+using System.Collections.Generic;
+using System.Linq;
 
 namespace Forto.Api.Controllers
 {
@@ -72,7 +74,43 @@ namespace Forto.Api.Controllers
             return OkResponse(data, "OK");
         }
 
+        /// <summary>الهدايا المتاحة بناءً على قائمة خدمات — اختياري: branchId لعرض المخزون.</summary>
+        [HttpGet("gift-options")]
+        public async Task<IActionResult> GetGiftOptionsByServices([FromQuery] string? serviceIds, [FromQuery] int? branchId = null)
+        {
+            var ids = string.IsNullOrWhiteSpace(serviceIds)
+                ? new List<int>()
+                : serviceIds.Split(',').Select(s => int.TryParse(s.Trim(), out var n) ? n : 0).Where(n => n > 0).ToList();
+            var data = await _service.GetGiftOptionsByServiceIdsAsync(ids, branchId);
+            return OkResponse(data, "OK");
+        }
 
+        /// <summary>قائمة الهدايا (منتجات) المربوطة بخدمة معينة.</summary>
+        [HttpGet("{serviceId:int}/gift-options")]
+        public async Task<IActionResult> GetGiftOptionsForService(int serviceId)
+        {
+            var data = await _service.GetGiftOptionsForServiceAsync(serviceId);
+            return OkResponse(data, "OK");
+        }
+
+        /// <summary>إضافة هدايا لخدمة — body: productIds فقط (حتى لو منتج واحد).</summary>
+        [HttpPost("{serviceId:int}/gift-options")]
+        public async Task<IActionResult> AddGiftOptionToService(int serviceId, [FromBody] AddGiftOptionToServiceRequest request)
+        {
+            if (request?.ProductIds == null || request.ProductIds.Count == 0)
+                return FailResponse("productIds is required (at least one)", 400);
+            var data = await _service.AddGiftOptionsToServiceAsync(serviceId, request.ProductIds);
+            return CreatedResponse(data, "Gift options added");
+        }
+
+        /// <summary>إزالة هدايا من الخدمة — body: productIds (قائمة).</summary>
+        [HttpDelete("{serviceId:int}/gift-options")]
+        public async Task<IActionResult> RemoveGiftOptionsFromService(int serviceId, [FromBody] RemoveGiftOptionsFromServiceRequest request)
+        {
+            if (request?.ProductIds == null || request.ProductIds.Count == 0)
+                return FailResponse("productIds is required (at least one)", 400);
+            var removed = await _service.RemoveGiftOptionsFromServiceAsync(serviceId, request.ProductIds);
+            return OkResponse(new { serviceId, removedCount = removed }, "Gift options removed");
+        }
     }
-
 }

@@ -23,6 +23,9 @@ namespace Forto.Application.DTOs.Bookings.cashier.checkout
 
         public List<ServiceAssignmentDto>? ServiceAssignments { get; set; } // optional but recommended
 
+        /// <summary>هدايا (من خيارات الهدايا للخدمات المكتملة) — تُضاف بعد الـ Complete وقبل الدفع.</summary>
+        public List<CashierGiftItemDto>? Gifts { get; set; }
+
         public List<PosInvoiceItemDto>? Products { get; set; } // optional products on the same invoice
 
         public string? Notes { get; set; }
@@ -58,4 +61,9 @@ namespace Forto.Application.DTOs.Bookings.cashier.checkout
         public decimal Qty { get; set; }
     }
 
+    /// <summary>بند هدية في طلب الـ checkout (ProductId من خيارات الهدايا للخدمة).</summary>
+    public class CashierGiftItemDto
+    {
+        public int ProductId { get; set; }
+    }
 }

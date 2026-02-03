@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Text;
@@ -276,6 +276,123 @@ namespace Forto.Application.Abstractions.Services.Dashboard
             };
         }
 
-    }
+        public async Task<TopEmployeesWithServicesResponse> GetTopEmployeesWithServicesAsync(int branchId, DateOnly from, DateOnly to, int? role = null)
+        {
+            if (to < from) throw new BusinessException("Invalid date range", 400);
 
+            var branch = await _uow.Repository<Branch>().GetByIdAsync(branchId);
+            if (branch == null || !branch.IsActive) throw new BusinessException("Branch not found", 404);
+
+            var fromStart = from.ToDateTime(TimeOnly.MinValue);
+            var toEnd = to.AddDays(1).ToDateTime(TimeOnly.MinValue);
+
+            var empRepo = _uow.Repository<Employee>();
+            var invRepo = _uow.Repository<Invoice>();
+
+            var empQuery = await empRepo.FindAsync(e => e.IsActive);
+            var allEmps = role.HasValue && Enum.IsDefined(typeof(EmployeeRole), role.Value)
+                ? empQuery.Where(e => (int)e.Role == role.Value).ToList()
+                : empQuery.ToList();
+
+            // الواقع: فواتير مدفوعة في الفترة في الفرع — ككاشير وكمشرف
+            var invoices = await invRepo.FindAsync(inv =>
+                inv.BranchId == branchId &&
+                inv.PaidAt != null &&
+                inv.PaidAt >= fromStart &&
+                inv.PaidAt < toEnd);
+
+            var byCashier = invoices
+                .Where(inv => inv.PaidByEmployeeId != null)
+                .GroupBy(inv => inv.PaidByEmployeeId!.Value)
+                .ToDictionary(g => g.Key, g => g.Count());
+            var bySupervisor = invoices
+                .Where(inv => inv.SupervisorId != null)
+                .GroupBy(inv => inv.SupervisorId!.Value)
+                .ToDictionary(g => g.Key, g => g.Count());
+            var totalInvoicesAsCashier = byCashier.Values.Sum();
+            var totalInvoicesAsSupervisor = bySupervisor.Values.Sum();
+
+            int total = 0;
+            var byEmployee = new Dictionary<int, List<BookingItem>>();
+            var serviceMap = new Dictionary<int, string>();
+
+
+                var bookingRepo = _uow.Repository<Booking>();
+                var itemRepo = _uow.Repository<BookingItem>();
+                var serviceRepo = _uow.Repository<Domain.Entities.Catalog.Service>();
+
+                // حجوزات مكتملة فقط (Complete) — مش أي حجز في الفترة
+                var bookings = await bookingRepo.FindAsync(b =>
+                    b.BranchId == branchId &&
+                    b.Status == BookingStatus.Completed &&
+                    b.ScheduledStart >= fromStart &&
+                    b.ScheduledStart < toEnd);
+                var bookingIds = bookings.Select(b => b.Id).ToList();
+                var doneItems = bookingIds.Count == 0
+                    ? new List<BookingItem>()
+                    : await itemRepo.FindAsync(i =>
+                        bookingIds.Contains(i.BookingId) &&
+                        i.Status == BookingItemStatus.Done &&
+                        i.AssignedEmployeeId != null);
+                total = doneItems.Count;
+                byEmployee = doneItems
+                    .GroupBy(i => i.AssignedEmployeeId!.Value)
+                    .ToDictionary(g => g.Key, g => g.ToList());
+                var serviceIds = doneItems.Select(i => i.ServiceId).Distinct().ToList();
+                var services = serviceIds.Count == 0 ? new List<Domain.Entities.Catalog.Service>() : await serviceRepo.FindAsync(s => serviceIds.Contains(s.Id));
+                serviceMap = services.ToDictionary(s => s.Id, s => s.Name);
+            
+
+            var items = new List<EmployeeWithServicesDto>();
+            foreach (var emp in allEmps.OrderBy(e => e.Name))
+            {
+                var employeeId = emp.Id;
+                var empName = emp.Name;
+                var empItems = byEmployee.TryGetValue(employeeId, out var list) ? list : new List<BookingItem>();
+                var count = empItems.Count;
+                var percent = total > 0 ? Math.Round((decimal)count * 100m / total, 2) : 0m;
+
+                var byService = empItems
+                    .GroupBy(i => i.ServiceId)
+                    .Select(g => new ServiceCountDto
+                    {
+                        ServiceId = g.Key,
+                        ServiceName = serviceMap.TryGetValue(g.Key, out var sn) ? sn : "",
+                        Count = g.Count()
+                    })
+                    .OrderByDescending(s => s.Count)
+                    .ToList();
+
+                var invoicesAsCashier = byCashier.TryGetValue(employeeId, out var c) ? c : 0;
+                var invoicesAsSupervisor = bySupervisor.TryGetValue(employeeId, out var s) ? s : 0;
+
+                items.Add(new EmployeeWithServicesDto
+                {
+                    EmployeeId = employeeId,
+                    EmployeeName = empName,
+                    Role = emp.Role,
+                    Count = count,
+                    Percent = percent,
+                    Services = byService,
+                    InvoicesAsCashierCount = invoicesAsCashier,
+                    InvoicesAsSupervisorCount = invoicesAsSupervisor
+                });
+            }
+
+
+                items = items.OrderByDescending(x => x.Count).ThenByDescending(x => x.InvoicesAsCashierCount).ThenBy(x => x.EmployeeName).ToList();
+
+            return new TopEmployeesWithServicesResponse
+            {
+                BranchId = branchId,
+                From = from,
+                To = to,
+                RoleFilter = role,
+                TotalDoneItems = total,
+                //TotalInvoicesAsCashier = totalInvoicesAsCashier,
+                //TotalInvoicesAsSupervisor = totalInvoicesAsSupervisor,
+                Items = items
+            };
+        }
+    }
 }
