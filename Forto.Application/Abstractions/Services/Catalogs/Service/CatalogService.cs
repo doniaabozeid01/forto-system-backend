@@ -610,7 +610,7 @@ namespace Forto.Application.Abstractions.Services.Catalogs.Service
             var opts = await giftOptRepo.FindTrackingAsync(o => o.ServiceId == serviceId && ids.Contains(o.ProductId));
             var count = opts.Count;
             foreach (var opt in opts)
-                giftOptRepo.Delete(opt);
+                giftOptRepo.HardDelete(opt);
             if (count > 0)
                 await _uow.SaveChangesAsync();
             return count;
