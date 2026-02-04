@@ -19,3 +19,5 @@ namespace Forto.Application.DTOs.Ops.Stock
         public decimal ReorderLevel { get; set; } = 0;
     }
 }
+
+
