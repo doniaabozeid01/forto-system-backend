@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Text;
@@ -126,16 +126,18 @@ namespace Forto.Application.Abstractions.Services.Ops.Stock.StockMovement
                 {
                     BranchId = branchId,
                     MaterialId = request.MaterialId,
-                    OnHandQty = 0,
+                    OnHandQty = request.Qty,
                     ReservedQty = 0,
                     ReorderLevel = 0
                 };
                 await stockRepo.AddAsync(stock);
+                // لا تستدعي Update على كيان جديد — الـ Id لسه مؤقت، EF بيولّده عند SaveChanges
             }
-
-            // update stock
-            stock.OnHandQty += request.Qty;
-            stockRepo.Update(stock);
+            else
+            {
+                stock.OnHandQty += request.Qty;
+                stockRepo.Update(stock);
+            }
 
             var occurred = request.OccurredAt ?? DateTime.UtcNow;
 
