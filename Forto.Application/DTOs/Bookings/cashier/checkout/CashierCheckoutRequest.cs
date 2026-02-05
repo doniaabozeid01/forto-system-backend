@@ -24,9 +24,12 @@ namespace Forto.Application.DTOs.Bookings.cashier.checkout
         public List<ServiceAssignmentDto>? ServiceAssignments { get; set; } // optional but recommended
 
         /// <summary>هدايا (من خيارات الهدايا للخدمات المكتملة) — تُضاف بعد الـ Complete وقبل الدفع.</summary>
-        public List<CashierGiftItemDto>? Gifts { get; set; }
+        //public List<CashierGiftItemDto>? Gifts { get; set; }
 
         public List<PosInvoiceItemDto>? Products { get; set; } // optional products on the same invoice
+
+        /// <summary>المجموع قبل الضريبة بعد تعديل الكاشير (زيادة أو نقص). لو مش مُرسل يُستخدم الـ SubTotal المحسوب. الـ Total النهائي = AdjustedTotal + (AdjustedTotal × 14%) - الخصم.</summary>
+        public decimal? AdjustedTotal { get; set; }
 
         public int GiftId { get; set; }
         public string? Notes { get; set; }

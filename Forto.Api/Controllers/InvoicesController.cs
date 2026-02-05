@@ -33,6 +33,16 @@ namespace Forto.Api.Controllers
             return OkResponse(data, "Paid");
         }
 
+        /// <summary>تعيين المجموع قبل الضريبة (AdjustedTotal) على الفاتورة قبل الدفع — مثلاً قبل إنهاء الخدمة. الـ Total يُحسب منه + ضريبة 14% - الخصم. الفاتورة لازم تكون Unpaid.</summary>
+        [HttpPatch("{invoiceId:int}/adjusted-total")]
+        public async Task<IActionResult> SetAdjustedTotal(int invoiceId, [FromBody] SetAdjustedTotalRequest request)
+        {
+            if (request == null)
+                return FailResponse("Request body required", 400);
+            var data = await _service.SetAdjustedTotalAsync(invoiceId, request.AdjustedTotal);
+            return OkResponse(data, "Adjusted total set");
+        }
+
 
 
 

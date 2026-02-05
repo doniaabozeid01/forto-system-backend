@@ -830,6 +830,34 @@ namespace Forto.Application.Abstractions.Services.Invoices
             return Map(inv);
         }
 
+        public async Task<InvoiceResponse> SetAdjustedTotalAsync(int invoiceId, decimal adjustedTotal)
+        {
+            var invRepo = _uow.Repository<Invoice>();
+            var lineRepo = _uow.Repository<InvoiceLine>();
+
+            var inv = await invRepo.GetByIdAsync(invoiceId);
+            if (inv == null)
+                throw new BusinessException("Invoice not found", 404);
+
+            if (inv.Status != InvoiceStatus.Unpaid)
+                throw new BusinessException("Invoice must be Unpaid to set adjusted total", 409);
+
+            if (adjustedTotal < 0)
+                throw new BusinessException("Adjusted total cannot be negative", 400);
+
+            inv.AdjustedTotal = adjustedTotal;
+            inv.TaxAmount = Math.Round(adjustedTotal * inv.TaxRate, 2);
+            inv.Total = adjustedTotal + inv.TaxAmount - inv.Discount;
+            if (inv.Total < 0) inv.Total = 0;
+
+            invRepo.Update(inv);
+            await _uow.SaveChangesAsync();
+
+            var lines = await lineRepo.FindAsync(l => l.InvoiceId == inv.Id);
+            inv.Lines = lines.ToList();
+
+            return Map(inv);
+        }
 
         public async Task<InvoiceResponse> SellProductAsync(int invoiceId, SellProductOnInvoiceRequest request)
         {
@@ -945,8 +973,10 @@ namespace Forto.Application.Abstractions.Services.Invoices
             SubTotal = inv.SubTotal,
             Discount = inv.Discount,
             Total = inv.Total,
+            AdjustedTotal = inv.AdjustedTotal,
             Status = inv.Status,
             PaidByEmployeeId = inv.PaidByEmployeeId,
+            SupervisorId = inv.SupervisorId,
             PaidAt = inv.PaidAt,
             PaymentMethod = inv.PaymentMethod,
             InvoiceNumber=inv.InvoiceNumber,
@@ -3539,7 +3569,7 @@ namespace Forto.Application.Abstractions.Services.Invoices
 
 
 
-
+         
         // ---------- helpers ----------
         private async Task RequireCashierAsync(int cashierId)
         {

@@ -379,12 +379,12 @@ namespace Forto.Application.Abstractions.Services.Bookings.Cashier.checkout
             invRepo.Update(invoice);
 
             // 5) إضافة الهدايا من الـ request (قبل المنتجات) — بعد الـ Complete والفاتورة جاهزة
-            if (request.Gifts != null && request.Gifts.Count > 0)
-            {
-                await AddGiftsFromCheckoutRequestAsync(invoice.Id, booking.Id, request.Gifts, request.CashierId);
-                await _uow.SaveChangesAsync();
-                await RecalcInvoiceFromAllLinesAsync(invoice.Id);
-            }
+            //if (request.Gifts != null && request.Gifts.Count > 0)
+            //{
+            //    await AddGiftsFromCheckoutRequestAsync(invoice.Id, booking.Id, request.Gifts, request.CashierId);
+            //    await _uow.SaveChangesAsync();
+            //    await RecalcInvoiceFromAllLinesAsync(invoice.Id);
+            //}
 
             // 6) Add products to same invoice (optional) + recalc totals from ALL lines
             if (request.Products != null && request.Products.Count > 0)
@@ -400,6 +400,22 @@ namespace Forto.Application.Abstractions.Services.Bookings.Cashier.checkout
             {
                 // ✅ even لو مفيش منتجات: تأكد totals = sum(lines) + VAT
                 await RecalcInvoiceFromAllLinesAsync(invoice.Id);
+            }
+
+            // ✅ تعديل المجموع قبل الضريبة من الكاشير — الـ Total يُحسب: AdjustedTotal + (AdjustedTotal × 14%) - Discount
+            if (request.AdjustedTotal.HasValue)
+            {
+                var invForAdjust = await invRepo.GetByIdAsync(invoice.Id);
+                if (invForAdjust != null)
+                {
+                    invForAdjust.AdjustedTotal = request.AdjustedTotal.Value;
+                    var effectiveSubTotal = request.AdjustedTotal.Value;
+                    invForAdjust.TaxAmount = Math.Round(effectiveSubTotal * invForAdjust.TaxRate, 2);
+                    invForAdjust.Total = effectiveSubTotal + invForAdjust.TaxAmount - invForAdjust.Discount;
+                    if (invForAdjust.Total < 0) invForAdjust.Total = 0;
+                    invRepo.Update(invForAdjust);
+                    await _uow.SaveChangesAsync();
+                }
             }
 
             // 7) Pay cash immediately (Paid)
@@ -684,6 +700,7 @@ namespace Forto.Application.Abstractions.Services.Bookings.Cashier.checkout
                 SubTotal = inv.SubTotal,
                 Discount = inv.Discount,
                 Total = inv.Total,
+                AdjustedTotal = inv.AdjustedTotal,
                 Status = inv.Status,
                 PaymentMethod = inv.PaymentMethod,
                 PaidAt = inv.PaidAt,

@@ -17,6 +17,8 @@ namespace Forto.Application.DTOs.Billings
         public decimal SubTotal { get; set; }
         public decimal Discount { get; set; }
         public decimal Total { get; set; }
+        /// <summary>المجموع قبل الضريبة بعد تعديل الكاشير (إن وُجد). الـ Total النهائي = AdjustedTotal + ضريبة 14% - الخصم.</summary>
+        public decimal? AdjustedTotal { get; set; }
 
         public InvoiceStatus Status { get; set; }
 

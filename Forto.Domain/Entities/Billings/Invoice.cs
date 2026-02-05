@@ -23,6 +23,8 @@ namespace Forto.Domain.Entities.Billings
         public decimal SubTotal { get; set; }
         public decimal Discount { get; set; } = 0;
         public decimal Total { get; set; }
+        /// <summary>المجموع قبل الضريبة بعد تعديل الكاشير (زيادة أو نقص). لو null يُستخدم SubTotal. الـ Total يُحسب منه: AdjustedTotal + (AdjustedTotal × 14%) - Discount.</summary>
+        public decimal? AdjustedTotal { get; set; }
 
         public InvoiceStatus Status { get; set; } = InvoiceStatus.Unpaid;
 
