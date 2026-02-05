@@ -1,6 +1,7 @@
 using Forto.Api.Common;
 using Forto.Application.Abstractions.Repositories;
 using Forto.Application.DTOs.Bookings;
+using Forto.Domain.Entities.Billings;
 using Forto.Domain.Entities.Bookings;
 using Forto.Domain.Entities.Catalog;
 using Forto.Domain.Entities.Clients;
@@ -2673,6 +2674,13 @@ namespace Forto.Application.Abstractions.Services.Bookings
 
             var bookingIds = bookings.Select(b => b.Id).ToList();
 
+            // invoices by booking (InvoiceId + IsPaid)
+            var invRepo = _uow.Repository<Invoice>();
+            var invoices = await invRepo.FindAsync(inv => inv.BookingId != null && bookingIds.Contains(inv.BookingId.Value));
+            var invoiceByBooking = invoices
+                .Where(inv => inv.BookingId.HasValue)
+                .ToDictionary(inv => inv.BookingId!.Value, inv => new { inv.Id, IsPaid = inv.Status == InvoiceStatus.Paid });
+
             // clients + cars
             var clientIds = bookings.Select(b => b.ClientId).Distinct().ToList();
             var carIds = bookings.Select(b => b.CarId).Distinct().ToList();
@@ -2723,6 +2731,8 @@ namespace Forto.Application.Abstractions.Services.Bookings
                     };
                 }).ToList();
 
+                invoiceByBooking.TryGetValue(b.Id, out var invInfo);
+
                 return new DTOs.Bookings.BookingListItemDto
                 {
                     BookingId = b.Id,
@@ -2736,7 +2746,9 @@ namespace Forto.Application.Abstractions.Services.Bookings
                     CarModel = car?.Model,
                     TotalPrice = b.TotalPrice,
                     ServicesCount = servicesLines.Count,
-                    Services = servicesLines
+                    Services = servicesLines,
+                    InvoiceId = invInfo?.Id,
+                    IsInvoicePaid = invInfo?.IsPaid ?? false
                 };
             }
 

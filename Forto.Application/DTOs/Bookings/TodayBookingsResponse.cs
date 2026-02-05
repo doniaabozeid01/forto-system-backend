@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Text;
@@ -36,6 +36,10 @@ namespace Forto.Application.DTOs.Bookings
         public int ServicesCount { get; set; }
         public List<BookingServiceLineDto> Services { get; set; } = new();
 
+        /// <summary>معرف الفاتورة لو الفاتورة موجودة للـ booking.</summary>
+        public int? InvoiceId { get; set; }
+        /// <summary>هل الفاتورة مدفوعة (Paid). لو مفيش فاتورة = false.</summary>
+        public bool IsInvoicePaid { get; set; }
     }
 
 
