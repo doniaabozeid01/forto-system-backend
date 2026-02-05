@@ -1,9 +1,10 @@
-﻿using Forto.Api.Common;
+using Forto.Api.Common;
 using Forto.Application.Abstractions.Repositories;
 using Forto.Application.Abstractions.Services.Clients;
 using Forto.Application.DTOs.Bookings.ClientBooking;
 using Forto.Application.DTOs.Cars;
 using Forto.Application.DTOs.Clients;
+using Forto.Domain.Entities.Billings;
 using Forto.Domain.Entities.Bookings;
 using Forto.Domain.Entities.Clients;
 using Forto.Domain.Enum;
@@ -19,7 +20,44 @@ namespace Forto.Application.Abstractions.Services.Clients
     {
         private readonly IUnitOfWork _uow;
 
+        private const int PremiumThresholdInvoices = 5;
+        private const int PremiumWindowMonths = 6;
+
         public ClientService(IUnitOfWork uow) => _uow = uow;
+
+        /// <summary>عدد الفواتير المدفوعة من حجوزات (خدمات فقط) في آخر 6 أشهر للعميل.</summary>
+        private async Task<int> GetPaidServiceInvoicesCountLast6MonthsAsync(int clientId)
+        {
+            var from = DateTime.UtcNow.AddMonths(-PremiumWindowMonths);
+            var invRepo = _uow.Repository<Invoice>();
+            var list = await invRepo.FindAsync(inv =>
+                inv.ClientId == clientId &&
+                inv.Status == InvoiceStatus.Paid &&
+                inv.BookingId != null &&
+                inv.PaidAt.HasValue &&
+                inv.PaidAt.Value >= from);
+            return list.Count;
+        }
+
+        private async Task<Dictionary<int, int>> GetPaidServiceInvoicesCountLast6MonthsBatchAsync(IReadOnlyList<int> clientIds)
+        {
+            if (clientIds == null || clientIds.Count == 0)
+                return new Dictionary<int, int>();
+
+            var from = DateTime.UtcNow.AddMonths(-PremiumWindowMonths);
+            var invRepo = _uow.Repository<Invoice>();
+            var list = await invRepo.FindAsync(inv =>
+                inv.ClientId != null &&
+                clientIds.Contains(inv.ClientId.Value) &&
+                inv.Status == InvoiceStatus.Paid &&
+                inv.BookingId != null &&
+                inv.PaidAt.HasValue &&
+                inv.PaidAt.Value >= from);
+
+            return list
+                .GroupBy(inv => inv.ClientId!.Value)
+                .ToDictionary(g => g.Key, g => g.Count());
+        }
 
         public async Task<ClientResponse> CreateAsync(CreateClientRequest request)
         {
@@ -44,13 +82,21 @@ namespace Forto.Application.Abstractions.Services.Clients
             await repo.AddAsync(client);
             await _uow.SaveChangesAsync();
 
-            return Map(client);
+            var response = Map(client);
+            response.PaidServiceInvoicesCountLast6Months = 0;
+            response.IsPremiumCustomer = false;
+            return response;
         }
 
         public async Task<ClientResponse?> GetByIdAsync(int id)
         {
             var client = await _uow.Repository<Client>().GetByIdAsync(id);
-            return client == null ? null : Map(client);
+            if (client == null) return null;
+            var response = Map(client);
+            var count = await GetPaidServiceInvoicesCountLast6MonthsAsync(client.Id);
+            response.PaidServiceInvoicesCountLast6Months = count;
+            response.IsPremiumCustomer = count >= PremiumThresholdInvoices;
+            return response;
         }
 
         //public async Task<IReadOnlyList<ClientResponse>> GetAllAsync()
@@ -73,9 +119,10 @@ namespace Forto.Application.Abstractions.Services.Clients
             if (clients.Count == 0)
                 return new List<ClientResponse>();
 
-            // 2) get all cars for those clients
+            // 2) get all cars + premium counts
             var clientIds = clients.Select(c => c.Id).ToList();
             var cars = await carRepo.FindAsync(c => clientIds.Contains(c.ClientId));
+            var premiumCounts = await GetPaidServiceInvoicesCountLast6MonthsBatchAsync(clientIds);
 
             // 3) group cars by client
             var carsByClient = cars
@@ -86,11 +133,14 @@ namespace Forto.Application.Abstractions.Services.Clients
             return clients.Select(c =>
             {
                 carsByClient.TryGetValue(c.Id, out var clientCars);
+                premiumCounts.TryGetValue(c.Id, out var count);
 
                 var response = Map(c);
                 response.Cars = (clientCars ?? new List<Car>())
                     .Select(MapClientCar)
                     .ToList();
+                response.PaidServiceInvoicesCountLast6Months = count;
+                response.IsPremiumCustomer = count >= PremiumThresholdInvoices;
 
                 return response;
             }).ToList();
@@ -146,7 +196,11 @@ namespace Forto.Application.Abstractions.Services.Clients
             repo.Update(client);
             await _uow.SaveChangesAsync();
 
-            return Map(client);
+            var response = Map(client);
+            var count = await GetPaidServiceInvoicesCountLast6MonthsAsync(client.Id);
+            response.PaidServiceInvoicesCountLast6Months = count;
+            response.IsPremiumCustomer = count >= PremiumThresholdInvoices;
+            return response;
         }
 
         public async Task<bool> DeleteAsync(int id)
@@ -218,9 +272,10 @@ namespace Forto.Application.Abstractions.Services.Clients
 
             if (clients.Count == 0) return new List<ClientLookupResponse>();
 
-            // 2) هات كل العربيات مرة واحدة لكل العملاء (بدل query لكل عميل)
+            // 2) هات كل العربيات + حالة العميل المميز
             var clientIds = clients.Select(c => c.Id).ToList();
             var cars = await carRepo.FindAsync(c => clientIds.Contains(c.ClientId));
+            var premiumCounts = await GetPaidServiceInvoicesCountLast6MonthsBatchAsync(clientIds);
 
             var carsByClient = cars.GroupBy(c => c.ClientId).ToDictionary(g => g.Key, g => g.ToList());
 
@@ -231,6 +286,7 @@ namespace Forto.Application.Abstractions.Services.Clients
             {
                 carsByClient.TryGetValue(client.Id, out var clientCars);
                 clientCars ??= new List<Car>();
+                premiumCounts.TryGetValue(client.Id, out var count);
 
                 var carDtos = clientCars.Select(MapCar).ToList();
                 var defaultCarId = carDtos.FirstOrDefault(x => x.IsDefault)?.Id;
@@ -243,7 +299,8 @@ namespace Forto.Application.Abstractions.Services.Clients
                     Email = client.Email,
                     IsActive = client.IsActive,
                     DefaultCarId = defaultCarId,
-                    Cars = carDtos
+                    Cars = carDtos,
+                    IsPremiumCustomer = count >= PremiumThresholdInvoices
                 });
             }
 

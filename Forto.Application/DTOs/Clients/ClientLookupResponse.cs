@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Text;
@@ -16,5 +16,8 @@ namespace Forto.Application.DTOs.Clients
 
         public int? DefaultCarId { get; set; }
         public List<Forto.Application.DTOs.Cars.CarResponse> Cars { get; set; } = new();
+
+        /// <summary>عميل مميز: 5 فواتير مدفوعة (خدمات) أو أكثر في آخر 6 أشهر.</summary>
+        public bool IsPremiumCustomer { get; set; }
     }
 }

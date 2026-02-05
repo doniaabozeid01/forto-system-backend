@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Text;
@@ -19,7 +19,10 @@ namespace Forto.Application.DTOs.Clients
 
         public List<ClientCarResponse> Cars { get; set; } = new();
 
-
+        /// <summary>عميل مميز: 5 فواتير مدفوعة (خدمات) أو أكثر في آخر 6 أشهر.</summary>
+        public bool IsPremiumCustomer { get; set; }
+        /// <summary>عدد الفواتير المدفوعة من حجوزات (خدمات) في آخر 6 أشهر.</summary>
+        public int PaidServiceInvoicesCountLast6Months { get; set; }
     }
 
 
