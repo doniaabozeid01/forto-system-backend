@@ -31,6 +31,13 @@ namespace Forto.Application.DTOs.Bookings.cashier.checkout
         /// <summary>المجموع قبل الضريبة بعد تعديل الكاشير (زيادة أو نقص). لو مش مُرسل يُستخدم الـ SubTotal المحسوب. الـ Total النهائي = AdjustedTotal + (AdjustedTotal × 14%) - الخصم.</summary>
         public decimal? AdjustedTotal { get; set; }
 
+        /// <summary>طريقة الدفع: Cash = كل المبلغ كاش والفيزا 0. Visa = كل المبلغ فيزا والكاش 0. Custom = حسب CashAmount و VisaAmount المُرسلة.</summary>
+        public PaymentMethod PaymentMethod { get; set; }
+        /// <summary>لـ Custom فقط: مبلغ الكاش. مع Cash/Visa يُتجاهل.</summary>
+        public decimal? CashAmount { get; set; }
+        /// <summary>لـ Custom فقط: مبلغ الفيزا. مع Cash/Visa يُتجاهل.</summary>
+        public decimal? VisaAmount { get; set; }
+
         public int GiftId { get; set; }
         public string? Notes { get; set; }
     }

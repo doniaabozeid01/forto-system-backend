@@ -23,6 +23,14 @@ namespace Forto.Api.Controllers
             return CreatedResponse(data, "Service created");
         }
 
+        [HttpPut("Update/{id:int}")]
+        public async Task<IActionResult> Update(int id, [FromBody] UpdateServiceRequest request)
+        {
+            var data = await _service.UpdateServiceAsync(id, request);
+            if (data == null) return FailResponse("Service not found", 404);
+            return OkResponse(data, "Service updated");
+        }
+
         [HttpGet("GetAll")]
         public async Task<IActionResult> GetAll([FromQuery] int? categoryId = null)
         {

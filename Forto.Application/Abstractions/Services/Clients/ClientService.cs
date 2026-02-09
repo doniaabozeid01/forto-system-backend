@@ -114,8 +114,8 @@ namespace Forto.Application.Abstractions.Services.Clients
             var clientRepo = _uow.Repository<Client>();
             var carRepo = _uow.Repository<Car>();
 
-            // 1) get all clients
-            var clients = await clientRepo.GetAllAsync();
+            // 1) get all clients (ما عدا الـ soft-deleted)
+            var clients = await clientRepo.FindAsync(c => !c.IsDeleted);
             if (clients.Count == 0)
                 return new List<ClientResponse>();
 

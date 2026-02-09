@@ -13,7 +13,7 @@ namespace Forto.Application.Abstractions.Services.Invoices
     {
         Task<InvoiceResponse?> GetByBookingIdAsync(int bookingId);
         Task<InvoiceResponse> EnsureInvoiceForBookingAsync(int bookingId); // create if not exists
-        Task<InvoiceResponse> PayCashAsync(int invoiceId, int cashierId);
+        Task<InvoiceResponse> PayCashAsync(int invoiceId, PayCashRequest request);
 
         /// <summary>تعيين المجموع قبل الضريبة (AdjustedTotal) على الفاتورة قبل الدفع — مثلاً قبل إنهاء الخدمة. الـ Total يُحسب منه + ضريبة 14% - الخصم.</summary>
         Task<InvoiceResponse> SetAdjustedTotalAsync(int invoiceId, decimal adjustedTotal);

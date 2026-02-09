@@ -26,6 +26,10 @@ namespace Forto.Application.DTOs.Billings
         public int? SupervisorId { get; set; }
         public DateTime? PaidAt { get; set; }
         public PaymentMethod? PaymentMethod { get; set; }
+        /// <summary>مبلغ الدفع كاش (للتسجيل فقط).</summary>
+        public decimal? CashAmount { get; set; }
+        /// <summary>مبلغ الدفع فيزا (للتسجيل فقط).</summary>
+        public decimal? VisaAmount { get; set; }
         public string ClientName { get; set; }
         public string ClientNumber { get; set; }
 

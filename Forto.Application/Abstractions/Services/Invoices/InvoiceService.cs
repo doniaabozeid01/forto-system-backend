@@ -25,6 +25,7 @@ namespace Forto.Application.Abstractions.Services.Invoices
         public InvoiceService(IUnitOfWork uow) => _uow = uow;
 
 
+        /// <summary>يجيب الفاتورة بالـ bookingId. لو مفيش فاتورة، يعملها (Ensure) ويرجعها.</summary>
         public async Task<InvoiceResponse?> GetByBookingIdAsync(int bookingId)
         {
             var invRepo = _uow.Repository<Invoice>();
@@ -32,7 +33,8 @@ namespace Forto.Application.Abstractions.Services.Invoices
 
             var invList = await invRepo.FindAsync(x => x.BookingId == bookingId);
             var inv = invList.FirstOrDefault();
-            if (inv == null) return null;
+            if (inv == null)
+                return await EnsureInvoiceForBookingAsync(bookingId);
 
             var lines = await lineRepo.FindAsync(l => l.InvoiceId == inv.Id);
             inv.Lines = lines.ToList();
@@ -793,8 +795,9 @@ namespace Forto.Application.Abstractions.Services.Invoices
             }
         }
 
-        public async Task<InvoiceResponse> PayCashAsync(int invoiceId, int cashierId)
+        public async Task<InvoiceResponse> PayCashAsync(int invoiceId, PayCashRequest request)
         {
+            var cashierId = request.CashierId;
             // check cashier role
             var empRepo = _uow.Repository<Employee>();
             var cashier = await empRepo.GetByIdAsync(cashierId);
@@ -815,8 +818,13 @@ namespace Forto.Application.Abstractions.Services.Invoices
             if (inv.Status == InvoiceStatus.Cancelled)
                 throw new BusinessException("Invoice is cancelled", 409);
 
+            var method = request.PaymentMethod ?? PaymentMethod.Cash;
+            var (cash, visa) = ResolveCashVisaAmounts(method, inv.Total, request.CashAmount, request.VisaAmount);
+
             inv.Status = InvoiceStatus.Paid;
-            inv.PaymentMethod = PaymentMethod.Cash;
+            inv.PaymentMethod = method;
+            inv.CashAmount = cash;
+            inv.VisaAmount = visa;
             inv.PaidByEmployeeId = cashierId;
             inv.PaidAt = DateTime.UtcNow;
 
@@ -828,6 +836,23 @@ namespace Forto.Application.Abstractions.Services.Invoices
             inv.Lines = lines.ToList();
 
             return Map(inv);
+        }
+
+        /// <summary>Cash → كل المبلغ كاش والفيزا 0. Visa → كل المبلغ فيزا والكاش 0. Custom → حسب المدخل.</summary>
+        private static (decimal cash, decimal visa) ResolveCashVisaAmounts(
+            PaymentMethod method, decimal total, decimal? requestCash, decimal? requestVisa)
+        {
+            switch (method)
+            {
+                case PaymentMethod.Cash:
+                    return (total, 0);
+                case PaymentMethod.Visa:
+                    return (0, total);
+                case PaymentMethod.Custom:
+                    return (requestCash ?? 0, requestVisa ?? 0);
+                default:
+                    return (total, 0);
+            }
         }
 
         public async Task<InvoiceResponse> SetAdjustedTotalAsync(int invoiceId, decimal adjustedTotal)
@@ -979,6 +1004,8 @@ namespace Forto.Application.Abstractions.Services.Invoices
             SupervisorId = inv.SupervisorId,
             PaidAt = inv.PaidAt,
             PaymentMethod = inv.PaymentMethod,
+            CashAmount = inv.CashAmount,
+            VisaAmount = inv.VisaAmount,
             InvoiceNumber=inv.InvoiceNumber,
             ClientName = inv.CustomerName,
             ClientNumber = inv.CustomerPhone,

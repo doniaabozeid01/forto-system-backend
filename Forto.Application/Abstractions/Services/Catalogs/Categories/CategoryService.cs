@@ -1,4 +1,4 @@
-﻿using Forto.Api.Common;
+using Forto.Api.Common;
 using Forto.Application.Abstractions.Repositories;
 using Forto.Application.DTOs.Catalog.Categories;
 using Forto.Domain.Entities.Catalog;
@@ -60,8 +60,8 @@ namespace Forto.Application.Abstractions.Services.Catalogs.Categories
             var repo = _uow.Repository<Category>();
 
             var list = parentId.HasValue
-                ? await repo.FindAsync(x => x.ParentId == parentId.Value)
-                : await repo.GetAllAsync();
+                ? await repo.FindAsync(x => x.ParentId == parentId.Value && !x.IsDeleted)
+                : await repo.FindAsync(x => !x.IsDeleted);
 
             return list.Select(Map).ToList();
         }

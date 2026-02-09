@@ -15,11 +15,12 @@ namespace Forto.Api.Controllers
         public InvoicesController(IInvoiceService service) => _service = service;
 
 
+        /// <summary>يجيب الفاتورة بالـ bookingId. لو مفيش فاتورة تُنشأ تلقائياً ثم تُرجَع (ما عدا لو الحجز ملغى أو غير موجود).</summary>
         [HttpGet("by-booking/{bookingId:int}")]
         public async Task<IActionResult> GetByBooking(int bookingId)
         {
             var data = await _service.GetByBookingIdAsync(bookingId);
-            if (data == null) return FailResponse("Invoice not found", 404);
+            if (data == null) return FailResponse("Booking not found or cancelled", 404);
             return OkResponse(data, "OK");
         }
 
@@ -29,7 +30,7 @@ namespace Forto.Api.Controllers
         [HttpPost("{invoiceId:int}/pay-cash")]
         public async Task<IActionResult> PayCash(int invoiceId, [FromBody] PayCashRequest request)
         {
-            var data = await _service.PayCashAsync(invoiceId, request.CashierId);
+            var data = await _service.PayCashAsync(invoiceId, request);
             return OkResponse(data, "Paid");
         }
 

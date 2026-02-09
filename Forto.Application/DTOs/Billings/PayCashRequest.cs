@@ -1,9 +1,5 @@
-﻿using System;
-using System.Collections.Generic;
+using Forto.Domain.Enum;
 using System.ComponentModel.DataAnnotations;
-using System.Linq;
-using System.Text;
-using System.Threading.Tasks;
 
 namespace Forto.Application.DTOs.Billings
 {
@@ -11,5 +7,11 @@ namespace Forto.Application.DTOs.Billings
     {
         [Required]
         public int CashierId { get; set; }
+        /// <summary>Cash = كل المبلغ كاش. Visa = كل المبلغ فيزا. Custom = حسب CashAmount و VisaAmount.</summary>
+        public PaymentMethod? PaymentMethod { get; set; }
+        /// <summary>لـ Custom فقط: مبلغ الكاش.</summary>
+        public decimal? CashAmount { get; set; }
+        /// <summary>لـ Custom فقط: مبلغ الفيزا.</summary>
+        public decimal? VisaAmount { get; set; }
     }
 }

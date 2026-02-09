@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Text;
@@ -41,7 +41,7 @@ namespace Forto.Application.Abstractions.Services.Inventory.Materials
 
         public async Task<IReadOnlyList<MaterialResponse>> GetAllAsync()
         {
-            var list = await _uow.Repository<Domain.Entities.Inventory.Material>().GetAllAsync();
+            var list = await _uow.Repository<Domain.Entities.Inventory.Material>().FindAsync(m => !m.IsDeleted);
             return list.Select(Map).ToList();
         }
 
@@ -80,7 +80,7 @@ namespace Forto.Application.Abstractions.Services.Inventory.Materials
             var m = await repo.GetByIdAsync(id);
             if (m == null) return false;
 
-            repo.HardDelete(m); // soft delete
+            repo.Delete(m); // soft delete
             await _uow.SaveChangesAsync();
             return true;
         }

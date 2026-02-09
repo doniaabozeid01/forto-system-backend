@@ -10,6 +10,7 @@ namespace Forto.Application.Abstractions.Services.Catalogs.Service
     public interface ICatalogService
     {
         Task<ServiceResponse> CreateServiceAsync(CreateServiceRequest request);
+        Task<ServiceResponse?> UpdateServiceAsync(int id, UpdateServiceRequest request);
         Task<ServiceResponse?> GetServiceAsync(int id);
         Task<IReadOnlyList<ServiceResponse>> GetServicesAsync(int? categoryId = null);
         Task<ServiceResponse?> UpsertRatesAsync(int serviceId, UpsertServiceRatesRequest request);

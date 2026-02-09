@@ -20,6 +20,7 @@ namespace Forto.Application.Abstractions.Services.Catalogs.Service
 {
     public class CatalogService : ICatalogService
     {
+
         private readonly IUnitOfWork _uow;
 
         public CatalogService(IUnitOfWork uow) => _uow = uow;
@@ -50,6 +51,26 @@ namespace Forto.Application.Abstractions.Services.Catalogs.Service
             };
         }
 
+        public async Task<ServiceResponse?> UpdateServiceAsync(int id, UpdateServiceRequest request)
+        {
+            var repo = _uow.Repository<Domain.Entities.Catalog.Service>();
+            var rateRepo = _uow.Repository<ServiceRate>();
+
+            var entity = await repo.GetByIdAsync(id);
+            if (entity == null) return null;
+
+            entity.CategoryId = request.CategoryId;
+            entity.Name = request.Name.Trim();
+            entity.Description = request.Description?.Trim();
+            entity.IsActive = request.IsActive;
+
+            repo.Update(entity);
+            await _uow.SaveChangesAsync();
+
+            var rates = await rateRepo.FindAsync(r => r.ServiceId == id);
+            return Map(entity, rates);
+        }
+
         public async Task<ServiceResponse?> GetServiceAsync(int id)
         {
             var serviceRepo = _uow.Repository<Domain.Entities.Catalog.Service>();
@@ -69,8 +90,8 @@ namespace Forto.Application.Abstractions.Services.Catalogs.Service
             var rateRepo = _uow.Repository<ServiceRate>();
 
             var services = categoryId.HasValue
-                ? await serviceRepo.FindAsync(s => s.CategoryId == categoryId.Value)
-                : await serviceRepo.GetAllAsync();
+                ? await serviceRepo.FindAsync(s => s.CategoryId == categoryId.Value && !s.IsDeleted)
+                : await serviceRepo.FindAsync(s => !s.IsDeleted);
 
             // جمع rates لكل الخدمات (simple version)
             var serviceIds = services.Select(s => s.Id).ToList();
@@ -169,8 +190,6 @@ namespace Forto.Application.Abstractions.Services.Catalogs.Service
             };
         }
 
-
-
         public async Task<IReadOnlyList<EmployeeResponse>> GetEmployeesForServiceAsync(int serviceId)
         {
             // تأكد الخدمة موجودة (اختياري بس لطيف)
@@ -202,10 +221,6 @@ namespace Forto.Application.Abstractions.Services.Catalogs.Service
                 })
                 .ToList();
         }
-
-
-
-
 
         //public async Task<IReadOnlyList<EmployeeResponse>> GetEmployeesForServiceAtAsync(
         //int serviceId,
@@ -336,12 +351,10 @@ namespace Forto.Application.Abstractions.Services.Catalogs.Service
         //        .ToList();
         //}
 
-
-
         public async Task<EmployeeAvailabilityResponse> GetEmployeesForServiceAtAsync(
-    int bookingId,
-    int serviceId,
-    DateTime scheduledStart)
+            int bookingId,
+            int serviceId,
+            DateTime scheduledStart)
         {
             var bookingRepo = _uow.Repository<Booking>();
             var itemRepo = _uow.Repository<BookingItem>();
@@ -615,10 +628,6 @@ namespace Forto.Application.Abstractions.Services.Catalogs.Service
                 await _uow.SaveChangesAsync();
             return count;
         }
-
-
-
-
 
     }
 }

@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Text;
@@ -43,7 +43,7 @@ namespace Forto.Application.Abstractions.Services.Inventory.Products
 
         public async Task<IReadOnlyList<ProductResponse>> GetAllAsync()
         {
-            var list = await _uow.Repository<Product>().GetAllAsync();
+            var list = await _uow.Repository<Product>().FindAsync(p => !p.IsDeleted);
             return list.Select(Map).ToList();
         }
         public async Task<IReadOnlyList<ProductWithStockResponse>> GetAllWithStockAsync(int branchId)
@@ -56,8 +56,8 @@ namespace Forto.Application.Abstractions.Services.Inventory.Products
             var productRepo = _uow.Repository<Product>();
             var stockRepo = _uow.Repository<BranchProductStock>();
 
-            // 1) products
-            var products = await productRepo.GetAllAsync();
+            // 1) products (ما عدا المحذوفة)
+            var products = await productRepo.FindAsync(p => !p.IsDeleted);
             if (products.Count == 0)
                 return new List<ProductWithStockResponse>();
 
@@ -130,7 +130,7 @@ namespace Forto.Application.Abstractions.Services.Inventory.Products
             var p = await repo.GetByIdAsync(id);
             if (p == null) return false;
 
-            repo.HardDelete(p);
+            repo.Delete(p);
             await _uow.SaveChangesAsync();
             return true;
         }

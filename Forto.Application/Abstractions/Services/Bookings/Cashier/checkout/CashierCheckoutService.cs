@@ -418,8 +418,9 @@ namespace Forto.Application.Abstractions.Services.Bookings.Cashier.checkout
                 }
             }
 
-            // 7) Pay cash immediately (Paid)
-            await PayInvoiceCashAsync(invoice.Id, request.CashierId, DateTime.UtcNow);
+            // 7) Pay immediately (Paid) + تسجيل طريقة الدفع ومبالغ كاش/فيزا
+            await PayInvoiceCashAsync(invoice.Id, request.CashierId, DateTime.UtcNow,
+                request.PaymentMethod, request.CashAmount, request.VisaAmount);
 
             // 8) return fresh invoice + lines
             var fresh = await invRepo.GetByIdAsync(invoice.Id);
@@ -652,7 +653,8 @@ namespace Forto.Application.Abstractions.Services.Bookings.Cashier.checkout
             await _uow.SaveChangesAsync();
         }
 
-        private async Task PayInvoiceCashAsync(int invoiceId, int cashierId, DateTime paidAt)
+        private async Task PayInvoiceCashAsync(int invoiceId, int cashierId, DateTime paidAt,
+            PaymentMethod paymentMethod, decimal? cashAmount = null, decimal? visaAmount = null)
         {
             var invRepo = _uow.Repository<Invoice>();
             var invoice = await invRepo.GetByIdAsync(invoiceId);
@@ -660,13 +662,34 @@ namespace Forto.Application.Abstractions.Services.Bookings.Cashier.checkout
 
             if (invoice.Status == InvoiceStatus.Paid) return;
 
+            var (cash, visa) = ResolveCashVisaAmounts(paymentMethod, invoice.Total, cashAmount, visaAmount);
+
             invoice.Status = InvoiceStatus.Paid;
-            invoice.PaymentMethod = PaymentMethod.Cash;
+            invoice.PaymentMethod = paymentMethod;
+            invoice.CashAmount = cash;
+            invoice.VisaAmount = visa;
             invoice.PaidByEmployeeId = cashierId;
             invoice.PaidAt = paidAt;
 
             invRepo.Update(invoice);
             await _uow.SaveChangesAsync();
+        }
+
+        /// <summary>Cash → كل المبلغ كاش والفيزا 0. Visa → كل المبلغ فيزا والكاش 0. Custom → حسب المدخل.</summary>
+        private static (decimal? cash, decimal? visa) ResolveCashVisaAmounts(
+            PaymentMethod method, decimal total, decimal? requestCash, decimal? requestVisa)
+        {
+            switch (method)
+            {
+                case PaymentMethod.Cash:
+                    return (total, 0);
+                case PaymentMethod.Visa:
+                    return (0, total);
+                case PaymentMethod.Custom:
+                    return (requestCash ?? 0, requestVisa ?? 0);
+                default:
+                    return (total, 0);
+            }
         }
 
 
@@ -703,6 +726,8 @@ namespace Forto.Application.Abstractions.Services.Bookings.Cashier.checkout
                 AdjustedTotal = inv.AdjustedTotal,
                 Status = inv.Status,
                 PaymentMethod = inv.PaymentMethod,
+                CashAmount = inv.CashAmount,
+                VisaAmount = inv.VisaAmount,
                 PaidAt = inv.PaidAt,
                 PaidByEmployeeId = inv.PaidByEmployeeId,
                 SupervisorId = inv.SupervisorId,

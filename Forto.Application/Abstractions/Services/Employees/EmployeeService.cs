@@ -148,14 +148,14 @@ namespace Forto.Application.Abstractions.Services.Employees
 
         public async Task<IReadOnlyList<EmployeeResponse>> GetAllAsync()
         {
-            var employees = await _uow.Repository<Employee>().GetAllAsync();
+            var employees = await _uow.Repository<Employee>().FindAsync(e => !e.IsDeleted);
             return employees.Select(Map).ToList();
         }
 
         public async Task<IReadOnlyList<EmployeeResponse>> GetSupervisorsAsync()
         {
             var repo = _uow.Repository<Employee>();
-            var supervisors = await repo.FindAsync(e => e.Role == Domain.Enum.EmployeeRole.Supervisor && e.IsActive);
+            var supervisors = await repo.FindAsync(e => !e.IsDeleted && e.Role == Domain.Enum.EmployeeRole.Supervisor && e.IsActive);
             return supervisors.Select(Map).ToList();
         }
 
