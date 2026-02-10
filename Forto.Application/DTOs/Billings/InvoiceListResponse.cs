@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Text;
@@ -20,6 +20,10 @@ namespace Forto.Application.DTOs.Billings
     {
         public int TotalCount { get; set; }
         public decimal TotalRevenue { get; set; }
+        /// <summary>إجمالي مبالغ الدفع كاش.</summary>
+        public decimal TotalCashAmount { get; set; }
+        /// <summary>إجمالي مبالغ الدفع فيزا.</summary>
+        public decimal TotalVisaAmount { get; set; }
     }
 
 public class InvoiceListItemDto
@@ -31,10 +35,17 @@ public class InvoiceListItemDto
     public decimal SubTotal { get; set; }
     public decimal Discount { get; set; }
     public decimal Total { get; set; }
+    /// <summary>مبلغ الدفع كاش.</summary>
+    public decimal? CashAmount { get; set; }
+    /// <summary>مبلغ الدفع فيزا.</summary>
+    public decimal? VisaAmount { get; set; }
     public InvoiceStatus? status { get; set; }
+    /// <summary>تاريخ ووقت الدفع إن وُجد.</summary>
+    public DateTime? PaidAt { get; set; }
     public string CustomerName { get; set; } = "";
     public string CustomerPhone { get; set; } = "";
-    // نص سريع للعرض (اختياري تسيبيه)
+    /// <summary>رقم لوحة العربية من الحجز.</summary>
+    public string PlateNumber { get; set; } = "";
     public string ItemsText { get; set; } = "";
     public List<InvoiceLineListDto> Lines { get; set; } = new();
 

@@ -32,6 +32,8 @@ namespace Forto.Application.DTOs.Billings
         public decimal? VisaAmount { get; set; }
         public string ClientName { get; set; }
         public string ClientNumber { get; set; }
+        /// <summary>رقم لوحة العربية من الحجز.</summary>
+        public string PlateNumber { get; set; } = "";
 
         public List<InvoiceLineResponse> Lines { get; set; } = new();
     }

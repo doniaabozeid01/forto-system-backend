@@ -39,7 +39,9 @@ namespace Forto.Application.Abstractions.Services.Invoices
             var lines = await lineRepo.FindAsync(l => l.InvoiceId == inv.Id);
             inv.Lines = lines.ToList();
 
-            return Map(inv);
+            var response = Map(inv);
+            await FillPlateNumberAsync(inv, response);
+            return response;
         }
 
 
@@ -831,11 +833,12 @@ namespace Forto.Application.Abstractions.Services.Invoices
             invRepo.Update(inv);
             await _uow.SaveChangesAsync();
 
-            // load lines
             var lines = await _uow.Repository<InvoiceLine>().FindAsync(l => l.InvoiceId == inv.Id);
             inv.Lines = lines.ToList();
 
-            return Map(inv);
+            var response = Map(inv);
+            await FillPlateNumberAsync(inv, response);
+            return response;
         }
 
         /// <summary>Cash → كل المبلغ كاش والفيزا 0. Visa → كل المبلغ فيزا والكاش 0. Custom → حسب المدخل.</summary>
@@ -881,7 +884,9 @@ namespace Forto.Application.Abstractions.Services.Invoices
             var lines = await lineRepo.FindAsync(l => l.InvoiceId == inv.Id);
             inv.Lines = lines.ToList();
 
-            return Map(inv);
+            var response = Map(inv);
+            await FillPlateNumberAsync(inv, response);
+            return response;
         }
 
         public async Task<InvoiceResponse> SellProductAsync(int invoiceId, SellProductOnInvoiceRequest request)
@@ -987,7 +992,9 @@ namespace Forto.Application.Abstractions.Services.Invoices
             var lines = await lineRepo.FindAsync(l => l.InvoiceId == invoice.Id);
             invoice.Lines = lines.ToList();
 
-            return Map(invoice);
+            var response = Map(invoice);
+            await FillPlateNumberAsync(invoice, response);
+            return response;
         }
 
 
@@ -1009,7 +1016,7 @@ namespace Forto.Application.Abstractions.Services.Invoices
             InvoiceNumber=inv.InvoiceNumber,
             ClientName = inv.CustomerName,
             ClientNumber = inv.CustomerPhone,
-            
+            PlateNumber = "",
             Lines = inv.Lines.Select(l => new InvoiceLineResponse
             {
                 Id = l.Id,
@@ -1020,6 +1027,14 @@ namespace Forto.Application.Abstractions.Services.Invoices
             }).ToList()
         };
 
+        private async Task FillPlateNumberAsync(Invoice inv, InvoiceResponse response)
+        {
+            if (!inv.BookingId.HasValue) return;
+            var booking = await _uow.Repository<Booking>().GetByIdAsync(inv.BookingId.Value);
+            if (booking == null) return;
+            var car = await _uow.Repository<Car>().GetByIdAsync(booking.CarId);
+            response.PlateNumber = car?.PlateNumber ?? "";
+        }
 
         public async Task<InvoiceGiftOptionsResponse> GetGiftOptionsAsync(int invoiceId)
         {
@@ -1243,7 +1258,9 @@ namespace Forto.Application.Abstractions.Services.Invoices
             var lines = await lineRepo.FindAsync(l => l.InvoiceId == invoice.Id);
             invoice.Lines = lines.ToList();
 
-            return Map(invoice);
+            var response = Map(invoice);
+            await FillPlateNumberAsync(invoice, response);
+            return response;
         }
 
 
@@ -2270,7 +2287,9 @@ namespace Forto.Application.Abstractions.Services.Invoices
             var lines = await lineRepo.FindAsync(l => l.InvoiceId == invoice.Id);
             invoice.Lines = lines.ToList();
 
-            return Map(invoice);
+            var response = Map(invoice);
+            await FillPlateNumberAsync(invoice, response);
+            return response;
         }
 
 
@@ -3191,13 +3210,26 @@ namespace Forto.Application.Abstractions.Services.Invoices
             // ===============================
             // 1) Load invoices
             // ===============================
+            // Payment method filter: all | cash | visa | custom
+            PaymentMethod? paymentMethodFilter = null;
+            if (!string.IsNullOrWhiteSpace(query.PaymentMethod) && query.PaymentMethod.Trim().ToLowerInvariant() != "all")
+            {
+                var pm = query.PaymentMethod.Trim().ToLowerInvariant();
+                paymentMethodFilter = pm switch
+                {
+                    "cash" => PaymentMethod.Cash,
+                    "visa" => PaymentMethod.Visa,
+                    "custom" => PaymentMethod.Custom,
+                    _ => throw new BusinessException("Invalid paymentMethod. Use all | cash | visa | custom", 400)
+                };
+            }
+
             var invoices = await invRepo.FindAsync(i =>
                 i.BranchId == query.BranchId &&
                 (fromDateOnly == null || DateOnly.FromDateTime(i.PaidAt ?? i.CreatedAt) >= fromDateOnly) &&
                 (toDateOnly == null || DateOnly.FromDateTime(i.PaidAt ?? i.CreatedAt) <= toDateOnly) &&
                 (statusFilter == null || i.Status == statusFilter) &&
-                (query.PaymentMethod == null || query.PaymentMethod == "all" ||
-                    (query.PaymentMethod == "cash" && i.PaymentMethod == PaymentMethod.Cash))
+                (paymentMethodFilter == null || i.PaymentMethod == paymentMethodFilter)
             );
 
             // ===============================
@@ -3229,9 +3261,10 @@ namespace Forto.Application.Abstractions.Services.Invoices
                 .ToList();
 
             var totalCount = invoices.Count;
-            var totalRevenue = invoices
-                .Where(i => i.Status == InvoiceStatus.Paid)
-                .Sum(i => i.Total);
+            var paidInvoices = invoices.Where(i => i.Status == InvoiceStatus.Paid).ToList();
+            var totalRevenue = paidInvoices.Sum(i => i.Total);
+            var totalCashAmount = paidInvoices.Sum(i => i.CashAmount ?? 0);
+            var totalVisaAmount = paidInvoices.Sum(i => i.VisaAmount ?? 0);
 
             // ===============================
             // Pagination
@@ -3246,7 +3279,9 @@ namespace Forto.Application.Abstractions.Services.Invoices
                     Summary = new InvoiceListSummary
                     {
                         TotalCount = totalCount,
-                        TotalRevenue = totalRevenue
+                        TotalRevenue = totalRevenue,
+                        TotalCashAmount = totalCashAmount,
+                        TotalVisaAmount = totalVisaAmount
                     },
                     Items = new List<InvoiceListItemDto>(),
                     Page = query.Page,
@@ -3273,10 +3308,16 @@ namespace Forto.Application.Abstractions.Services.Invoices
                 .ToList();
 
             var bookingClientMap = new Dictionary<int, int>();
+            var bookingPlateMap = new Dictionary<int, string>();
             if (bookingIds.Count > 0)
             {
                 var bookings = await bookingRepo.FindAsync(b => bookingIds.Contains(b.Id));
                 bookingClientMap = bookings.ToDictionary(b => b.Id, b => b.ClientId);
+                var carIds = bookings.Select(b => b.CarId).Distinct().ToList();
+                var cars = carIds.Count > 0 ? await _uow.Repository<Car>().FindAsync(c => carIds.Contains(c.Id)) : new List<Car>();
+                var carPlateMap = cars.ToDictionary(c => c.Id, c => c.PlateNumber ?? "");
+                foreach (var b in bookings)
+                    bookingPlateMap[b.Id] = carPlateMap.TryGetValue(b.CarId, out var plate) ? plate : "";
             }
 
             var clientIds = new HashSet<int>();
@@ -3336,18 +3377,24 @@ namespace Forto.Application.Abstractions.Services.Invoices
                 if (string.IsNullOrWhiteSpace(customerName))
                     customerName = "---";
 
+                var plateNumber = inv.BookingId.HasValue && bookingPlateMap.TryGetValue(inv.BookingId.Value, out var plate) ? plate : "";
+
                 return new InvoiceListItemDto
                 {
                     InvoiceId = inv.Id,
                     InvoiceNumber = inv.InvoiceNumber,
                     Date = inv.PaidAt ?? inv.CreatedAt,
                     status = inv.Status,
+                    PaidAt = inv.PaidAt,
                     PaymentMethod = inv.PaymentMethod ?? PaymentMethod.Cash,
                     SubTotal = inv.SubTotal,
                     Discount = inv.Discount,
                     Total = inv.Total,
+                    CashAmount = inv.CashAmount,
+                    VisaAmount = inv.VisaAmount,
                     CustomerName = customerName,
                     CustomerPhone = customerPhone,
+                    PlateNumber = plateNumber,
                     ItemsText = itemsText,
                     Lines = lineDtos
                 };
@@ -3358,7 +3405,9 @@ namespace Forto.Application.Abstractions.Services.Invoices
                 Summary = new InvoiceListSummary
                 {
                     TotalCount = totalCount,
-                    TotalRevenue = totalRevenue
+                    TotalRevenue = totalRevenue,
+                    TotalCashAmount = totalCashAmount,
+                    TotalVisaAmount = totalVisaAmount
                 },
                 Items = items,
                 Page = query.Page,
@@ -3451,7 +3500,9 @@ namespace Forto.Application.Abstractions.Services.Invoices
                 }
                 var exLines = await lineRepo.FindAsync(l => l.InvoiceId == existing.Id);
                 existing.Lines = exLines.ToList();
-                return Map(existing);
+                var existingResponse = Map(existing);
+                await FillPlateNumberAsync(existing, existingResponse);
+                return existingResponse;
             }
 
             // create invoice
@@ -3487,7 +3538,9 @@ namespace Forto.Application.Abstractions.Services.Invoices
             await _uow.SaveChangesAsync();
 
             invoice.Lines = lines.ToList();
-            return Map(invoice);
+            var newResponse = Map(invoice);
+            await FillPlateNumberAsync(invoice, newResponse);
+            return newResponse;
         }
 
 

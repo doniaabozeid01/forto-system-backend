@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Text;
@@ -13,7 +13,8 @@ namespace Forto.Application.DTOs.Billings
         public string? From { get; set; }
         public string? To { get; set; }
 
-        public string? PaymentMethod { get; set; } // "all" | "cash"
+        /// <summary>فلتر طريقة الدفع: "all" أو فارغ = الكل، "cash" = كاش، "visa" = فيزا، "custom" = مخلوط.</summary>
+        public string? PaymentMethod { get; set; }
         public string? Q { get; set; } // invoiceId OR phone OR name
 
         public string? status { get; set; }

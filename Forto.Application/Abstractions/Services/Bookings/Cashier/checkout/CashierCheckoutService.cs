@@ -422,14 +422,24 @@ namespace Forto.Application.Abstractions.Services.Bookings.Cashier.checkout
             await PayInvoiceCashAsync(invoice.Id, request.CashierId, DateTime.UtcNow,
                 request.PaymentMethod, request.CashAmount, request.VisaAmount);
 
-            // 8) return fresh invoice + lines
+            // 8) return fresh invoice + lines + رقم العربية
             var fresh = await invRepo.GetByIdAsync(invoice.Id);
             if (fresh == null) throw new BusinessException("Invoice not found", 404);
 
             var lines = await lineRepo.FindAsync(l => l.InvoiceId == fresh.Id);
             fresh.Lines = lines.ToList();
 
-            return MapInvoice(fresh);
+            var response = MapInvoice(fresh);
+            if (fresh.BookingId.HasValue)
+            {
+                var bookingForPlate = await _uow.Repository<Booking>().GetByIdAsync(fresh.BookingId.Value);
+                if (bookingForPlate != null)
+                {
+                    var car = await _uow.Repository<Car>().GetByIdAsync(bookingForPlate.CarId);
+                    response.PlateNumber = car?.PlateNumber ?? "";
+                }
+            }
+            return response;
         }
 
 
@@ -692,16 +702,7 @@ namespace Forto.Application.Abstractions.Services.Bookings.Cashier.checkout
             }
         }
 
-
-
-
-
-
         private const decimal DefaultVatRate = 0.14m;
-
-
-
-
 
         private static void RecalcInvoiceTotals(Invoice inv, decimal subTotal)
         {
@@ -728,6 +729,7 @@ namespace Forto.Application.Abstractions.Services.Bookings.Cashier.checkout
                 PaymentMethod = inv.PaymentMethod,
                 CashAmount = inv.CashAmount,
                 VisaAmount = inv.VisaAmount,
+                PlateNumber = "",
                 PaidAt = inv.PaidAt,
                 PaidByEmployeeId = inv.PaidByEmployeeId,
                 SupervisorId = inv.SupervisorId,

@@ -16,7 +16,6 @@
 
         public static ApiResponse<T> Fail(string message, Dictionary<string, string[]>? errors, string traceId)
             => new() { Success = false, Message = message, Data = default, Errors = errors };
+        
     }
-
 }
-

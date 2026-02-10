@@ -405,9 +405,8 @@ namespace Forto.Application.Abstractions.Services.Bookings
 
             var shiftMap = shifts.ToDictionary(x => x.Id, x => x);
 
-            // 5) Determine minStart/maxEnd from schedules
-            TimeOnly? minStart = null;
-            TimeOnly? maxEnd = null;
+            // 5) Collect all (start, end) ranges and build hour slots (support overnight shifts)
+            var hourSet = new HashSet<TimeOnly>();
 
             foreach (var s in schedules)
             {
@@ -422,11 +421,31 @@ namespace Forto.Application.Abstractions.Services.Bookings
 
                 if (start == null || end == null) continue;
 
-                minStart = minStart == null || start < minStart ? start : minStart;
-                maxEnd = maxEnd == null || end > maxEnd ? end : maxEnd;
+                var st = start.Value;
+                var en = end.Value;
+
+                if (st < en)
+                {
+                    // Normal range (e.g. 08:00 - 16:00)
+                    for (var t = st; t < en; t = t.AddHours(1))
+                        hourSet.Add(t);
+                }
+                else
+                {
+                    // Overnight shift (e.g. 23:00 - 16:00 or 23:59 - 00:00): same day = from start to 23:00 + 00:00 to end
+                    var t = new TimeOnly(st.Hour, 0);
+                    while (true)
+                    {
+                        hourSet.Add(t);
+                        if (t.Hour == 23 && t.Minute == 0) break;
+                        t = t.AddHours(1);
+                    }
+                    for (var t2 = new TimeOnly(0, 0); t2 < en; t2 = t2.AddHours(1))
+                        hourSet.Add(t2);
+                }
             }
 
-            if (minStart == null || maxEnd == null || minStart >= maxEnd)
+            if (hourSet.Count == 0)
             {
                 return new AvailableSlotsResponse
                 {
@@ -436,10 +455,8 @@ namespace Forto.Application.Abstractions.Services.Bookings
                 };
             }
 
-            // 6) Build hour slots
-            var hours = new List<TimeOnly>();
-            for (var t = minStart.Value; t < maxEnd.Value; t = t.AddHours(1))
-                hours.Add(t);
+            // 6) Ordered hour slots
+            var hours = hourSet.OrderBy(h => h).ToList();
 
             // 7) Load bookings for that day ONCE (performance + avoid random 500)
             var bookingRepo = _uow.Repository<Booking>();
