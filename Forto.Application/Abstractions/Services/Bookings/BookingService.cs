@@ -374,91 +374,12 @@ namespace Forto.Application.Abstractions.Services.Bookings
 
             var svcIds = serviceIds.Distinct().ToList();
 
-            // 3) Load schedules for that day
-            var dow = date.DayOfWeek;
+            // 3) Always return the full 24 hours — each slot shows how many booked vs available
+            var hours = new List<TimeOnly>(24);
+            for (var h = 0; h < 24; h++)
+                hours.Add(new TimeOnly(h, 0));
 
-            var scheduleRepo = _uow.Repository<EmployeeWorkSchedule>();
-            var shiftRepo = _uow.Repository<Domain.Entities.Employees.Shift>();
-
-            var schedules = await scheduleRepo.FindAsync(s => s.DayOfWeek == dow && !s.IsOff);
-
-            if (schedules.Count == 0)
-            {
-                return new AvailableSlotsResponse
-                {
-                    Date = date,
-                    CapacityPerHour = branch.CapacityPerHour,
-                    Slots = new List<HourSlotDto>()
-                };
-            }
-
-            // 4) Resolve shifts referenced
-            var shiftIds = schedules
-                .Where(s => s.ShiftId.HasValue)
-                .Select(s => s.ShiftId!.Value)
-                .Distinct()
-                .ToList();
-
-            var shifts = shiftIds.Count == 0
-                ? new List<Domain.Entities.Employees.Shift>()
-                : (await shiftRepo.FindAsync(x => shiftIds.Contains(x.Id))).ToList();
-
-            var shiftMap = shifts.ToDictionary(x => x.Id, x => x);
-
-            // 5) Collect all (start, end) ranges and build hour slots (support overnight shifts)
-            var hourSet = new HashSet<TimeOnly>();
-
-            foreach (var s in schedules)
-            {
-                TimeOnly? start = s.StartTime;
-                TimeOnly? end = s.EndTime;
-
-                if (s.ShiftId.HasValue && shiftMap.TryGetValue(s.ShiftId.Value, out var sh))
-                {
-                    start ??= sh.StartTime;
-                    end ??= sh.EndTime;
-                }
-
-                if (start == null || end == null) continue;
-
-                var st = start.Value;
-                var en = end.Value;
-
-                if (st < en)
-                {
-                    // Normal range (e.g. 08:00 - 16:00)
-                    for (var t = st; t < en; t = t.AddHours(1))
-                        hourSet.Add(t);
-                }
-                else
-                {
-                    // Overnight shift (e.g. 23:00 - 16:00 or 23:59 - 00:00): same day = from start to 23:00 + 00:00 to end
-                    var t = new TimeOnly(st.Hour, 0);
-                    while (true)
-                    {
-                        hourSet.Add(t);
-                        if (t.Hour == 23 && t.Minute == 0) break;
-                        t = t.AddHours(1);
-                    }
-                    for (var t2 = new TimeOnly(0, 0); t2 < en; t2 = t2.AddHours(1))
-                        hourSet.Add(t2);
-                }
-            }
-
-            if (hourSet.Count == 0)
-            {
-                return new AvailableSlotsResponse
-                {
-                    Date = date,
-                    CapacityPerHour = branch.CapacityPerHour,
-                    Slots = new List<HourSlotDto>()
-                };
-            }
-
-            // 6) Ordered hour slots
-            var hours = hourSet.OrderBy(h => h).ToList();
-
-            // 7) Load bookings for that day ONCE (performance + avoid random 500)
+            // 4) Load bookings for that day ONCE (performance + avoid random 500)
             var bookingRepo = _uow.Repository<Booking>();
 
             var dayStart = date.ToDateTime(TimeOnly.MinValue);
@@ -470,8 +391,8 @@ namespace Forto.Application.Abstractions.Services.Bookings
                 b.ScheduledStart < dayEnd &&
                 b.Status != BookingStatus.Cancelled);
 
-            // group booked counts by SlotHourStart
-            var bookedMap = dayBookings
+            // group booked counts by SlotHourStart (guard against null from FindAsync)
+            var bookedMap = (dayBookings ?? Enumerable.Empty<Booking>())
                 .GroupBy(b => b.SlotHourStart)
                 .ToDictionary(g => g.Key, g => g.Count());
 
@@ -482,7 +403,10 @@ namespace Forto.Application.Abstractions.Services.Bookings
                 Slots = new List<HourSlotDto>()
             };
 
-            // 8) Evaluate each hour
+            // 5) Evaluate each hour: booked count, available = capacity - booked (0 if no staff)
+            if (hours == null)
+                hours = Enumerable.Range(0, 24).Select(h => new TimeOnly(h, 0)).ToList();
+
             foreach (var hour in hours)
             {
                 var slotStart = date.ToDateTime(hour);
