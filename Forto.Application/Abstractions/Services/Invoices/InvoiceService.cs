@@ -3298,6 +3298,41 @@ namespace Forto.Application.Abstractions.Services.Invoices
             var totalVisaAmount = paidInvoices.Sum(i => i.VisaAmount ?? 0);
 
             // ===============================
+            // Cost & profit (تكلفة من مواد + منتجات، ربح = إيراد − تكلفة)
+            // ===============================
+            var allBookingIds = invoices.Where(i => i.BookingId.HasValue).Select(i => i.BookingId!.Value).Distinct().ToList();
+            var allInvoiceIds = invoices.Select(i => i.Id).ToList();
+            var materialRepo = _uow.Repository<MaterialMovement>();
+            var productMoveRepo = _uow.Repository<ProductMovement>();
+
+            var materialCostsByBooking = new Dictionary<int, decimal>();
+            if (allBookingIds.Count > 0)
+            {
+                var consumeMovements = await materialRepo.FindAsync(m =>
+                    m.BookingId.HasValue && allBookingIds.Contains(m.BookingId.Value) && m.MovementType == MaterialMovementType.Consume);
+                foreach (var g in consumeMovements.GroupBy(m => m.BookingId!.Value))
+                    materialCostsByBooking[g.Key] = g.Sum(m => m.TotalCost);
+            }
+
+            var productCostsByInvoice = new Dictionary<int, decimal>();
+            if (allInvoiceIds.Count > 0)
+            {
+                var productMovements = await productMoveRepo.FindAsync(p => p.InvoiceId.HasValue && allInvoiceIds.Contains(p.InvoiceId.Value));
+                foreach (var g in productMovements.GroupBy(p => p.InvoiceId!.Value))
+                    productCostsByInvoice[g.Key] = g.Sum(p => p.TotalCost);
+            }
+
+            decimal GetInvoiceCost(Invoice inv)
+            {
+                var matCost = inv.BookingId.HasValue && materialCostsByBooking.TryGetValue(inv.BookingId.Value, out var mc) ? mc : 0;
+                var prodCost = productCostsByInvoice.TryGetValue(inv.Id, out var pc) ? pc : 0;
+                return matCost + prodCost;
+            }
+
+            var totalCost = paidInvoices.Sum(inv => GetInvoiceCost(inv));
+            var totalProfit = totalRevenue - totalCost;
+
+            // ===============================
             // Pagination
             // ===============================
             var skip = (query.Page - 1) * query.PageSize;
@@ -3312,7 +3347,9 @@ namespace Forto.Application.Abstractions.Services.Invoices
                         TotalCount = totalCount,
                         TotalRevenue = totalRevenue,
                         TotalCashAmount = totalCashAmount,
-                        TotalVisaAmount = totalVisaAmount
+                        TotalVisaAmount = totalVisaAmount,
+                        TotalCost = totalCost,
+                        TotalProfit = totalProfit
                     },
                     Items = new List<InvoiceListItemDto>(),
                     Page = query.Page,
@@ -3410,6 +3447,7 @@ namespace Forto.Application.Abstractions.Services.Invoices
 
                 var plateNumber = inv.BookingId.HasValue && bookingPlateMap.TryGetValue(inv.BookingId.Value, out var plate) ? plate : "";
 
+                var invCost = GetInvoiceCost(inv);
                 return new InvoiceListItemDto
                 {
                     InvoiceId = inv.Id,
@@ -3421,6 +3459,8 @@ namespace Forto.Application.Abstractions.Services.Invoices
                     SubTotal = inv.SubTotal,
                     Discount = inv.Discount,
                     Total = inv.Total,
+                    TotalCost = invCost,
+                    Profit = inv.Total - invCost,
                     CashAmount = inv.CashAmount,
                     VisaAmount = inv.VisaAmount,
                     CustomerName = customerName,
@@ -3439,7 +3479,9 @@ namespace Forto.Application.Abstractions.Services.Invoices
                     TotalCount = totalCount,
                     TotalRevenue = totalRevenue,
                     TotalCashAmount = totalCashAmount,
-                    TotalVisaAmount = totalVisaAmount
+                    TotalVisaAmount = totalVisaAmount,
+                    TotalCost = totalCost,
+                    TotalProfit = totalProfit
                 },
                 Items = items,
                 Page = query.Page,

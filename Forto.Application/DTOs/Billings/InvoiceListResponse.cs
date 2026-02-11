@@ -24,6 +24,10 @@ namespace Forto.Application.DTOs.Billings
         public decimal TotalCashAmount { get; set; }
         /// <summary>إجمالي مبالغ الدفع فيزا.</summary>
         public decimal TotalVisaAmount { get; set; }
+        /// <summary>إجمالي التكلفة (فواتير مدفوعة فقط).</summary>
+        public decimal TotalCost { get; set; }
+        /// <summary>إجمالي الربح (إيراد − تكلفة).</summary>
+        public decimal TotalProfit { get; set; }
     }
 
 public class InvoiceListItemDto
@@ -35,6 +39,10 @@ public class InvoiceListItemDto
     public decimal SubTotal { get; set; }
     public decimal Discount { get; set; }
     public decimal Total { get; set; }
+    /// <summary>تكلفة الفاتورة (مواد + منتجات).</summary>
+    public decimal TotalCost { get; set; }
+    /// <summary>الربح = Total − TotalCost.</summary>
+    public decimal Profit { get; set; }
     /// <summary>مبلغ الدفع كاش.</summary>
     public decimal? CashAmount { get; set; }
     /// <summary>مبلغ الدفع فيزا.</summary>
