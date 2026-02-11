@@ -2306,7 +2306,8 @@ namespace Forto.Application.Abstractions.Services.Bookings
                 }
             }
 
-            item.MaterialAdjustment = usages.Sum(u => u.ExtraCharge);
+            // لو بالموجب نزودها على الفاتورة، لو بالسالب الفاتورة زي ما هي (ما نخصمش)
+            item.MaterialAdjustment = usages.Sum(u => u.ExtraCharge > 0 ? u.ExtraCharge : 0);
 
             // سعر الخدمة للفاتورة
             var serviceCharge = item.UnitPrice + item.MaterialAdjustment;

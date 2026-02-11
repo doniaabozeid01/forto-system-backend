@@ -217,7 +217,8 @@ namespace Forto.Application.Abstractions.Services.Bookings.Cashier
                     }
                 }
 
-                item.MaterialAdjustment = usages.Sum(u => u.ExtraCharge);
+                // لو بالموجب نزودها على الفاتورة، لو بالسالب الفاتورة زي ما هي (ما نخصمش)
+                item.MaterialAdjustment = usages.Sum(u => u.ExtraCharge > 0 ? u.ExtraCharge : 0);
                 item.Status = BookingItemStatus.Done;
                 item.CompletedAt = now;
                 itemRepo.Update(item);

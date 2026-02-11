@@ -881,6 +881,10 @@ namespace Forto.Application.Abstractions.Services.Invoices
             if (adjustedTotal < 0)
                 throw new BusinessException("Adjusted total cannot be negative", 400);
 
+            var currentBase = inv.AdjustedTotal ?? inv.SubTotal;
+            if (adjustedTotal < currentBase)
+                throw new BusinessException("لا يمكن تخفيض المبلغ؛ مسموح بالزيادة فقط.", 400);
+
             inv.AdjustedTotal = adjustedTotal;
             inv.TaxAmount = Math.Round(adjustedTotal * inv.TaxRate, 2);
             inv.Total = adjustedTotal + inv.TaxAmount - inv.Discount;

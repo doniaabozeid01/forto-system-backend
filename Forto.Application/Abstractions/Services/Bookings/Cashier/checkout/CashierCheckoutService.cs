@@ -443,9 +443,6 @@ namespace Forto.Application.Abstractions.Services.Bookings.Cashier.checkout
         }
 
 
-        
-
-
         // ----------------- helpers ----------------- //
         private async Task RequireCashierAsync(int cashierId)
         {

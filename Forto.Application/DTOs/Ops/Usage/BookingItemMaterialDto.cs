@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Text;
@@ -16,6 +16,9 @@ namespace Forto.Application.DTOs.Ops.Usage
         public decimal ReservedQty { get; set; }
         public decimal ActualQty { get; set; }
 
+        /// <summary>سعر الوحدة كتكلفة (عليا) — مسجل وقت التسجيل.</summary>
+        public decimal UnitCost { get; set; }
+        /// <summary>سعر الوحدة كبيع للعميل — مسجل وقت التسجيل.</summary>
         public decimal UnitCharge { get; set; }
         public decimal ExtraCharge { get; set; }
     }

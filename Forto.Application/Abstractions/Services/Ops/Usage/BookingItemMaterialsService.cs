@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Text;
@@ -202,20 +202,15 @@ namespace Forto.Application.Abstractions.Services.Ops.Usage
                 // update actual
                 usage.ActualQty = newActual;
 
+                // تسجيل سعر التكلفة وسعر البيع وقت التسجيل (دلوقتي)
+                if (matMap.TryGetValue(usage.MaterialId, out var mat))
+                {
+                    usage.UnitCost = mat.CostPerUnit;
+                    usage.UnitCharge = mat.ChargePerUnit;
+                }
 
-                // recompute extra charge
-                //var extraQty = usage.ActualQty - usage.DefaultQty;
-                //if (extraQty < 0) extraQty = 0;
-                //usage.ExtraCharge = extraQty * usage.UnitCharge;
-
-
-
-                var diffQty = usage.ActualQty - usage.DefaultQty; // ممكن بالسالب      -5
+                var diffQty = usage.ActualQty - usage.DefaultQty; // ممكن بالسالب
                 usage.ExtraCharge = diffQty * usage.UnitCharge;
-
-
-
-
 
                 usage.RecordedByEmployeeId = employeeId;
                 usage.RecordedAt = DateTime.UtcNow;
@@ -255,6 +250,7 @@ namespace Forto.Application.Abstractions.Services.Ops.Usage
                     DefaultQty = u.DefaultQty,
                     ReservedQty = u.ReservedQty,
                     ActualQty = u.ActualQty,
+                    UnitCost = u.UnitCost,
                     UnitCharge = u.UnitCharge,
                     ExtraCharge = u.ExtraCharge
                 };
