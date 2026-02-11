@@ -875,8 +875,8 @@ namespace Forto.Application.Abstractions.Services.Invoices
             if (inv == null)
                 throw new BusinessException("Invoice not found", 404);
 
-            if (inv.Status != InvoiceStatus.Unpaid)
-                throw new BusinessException("Invoice must be Unpaid to set adjusted total", 409);
+            if (inv.Status == InvoiceStatus.Cancelled || inv.Status == InvoiceStatus.Deleted)
+                throw new BusinessException("Cannot adjust a cancelled or deleted invoice", 409);
 
             if (adjustedTotal < 0)
                 throw new BusinessException("Adjusted total cannot be negative", 400);
