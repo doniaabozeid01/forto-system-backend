@@ -3255,11 +3255,28 @@ namespace Forto.Application.Abstractions.Services.Invoices
                 }
                 else
                 {
+                    var qLower = q.ToLowerInvariant();
+                    var searchBookingIds = invoices.Where(i => i.BookingId.HasValue).Select(i => i.BookingId!.Value).Distinct().ToList();
+                    var bookingToPlate = new Dictionary<int, string>();
+                    if (searchBookingIds.Count > 0)
+                    {
+                        var bookings = await bookingRepo.FindAsync(b => searchBookingIds.Contains(b.Id));
+                        var carIds = bookings.Select(b => b.CarId).Distinct().ToList();
+                        var cars = carIds.Count > 0 ? await _uow.Repository<Car>().FindAsync(c => carIds.Contains(c.Id)) : new List<Car>();
+                        var carPlateMap = cars.ToDictionary(c => c.Id, c => (c.PlateNumber ?? "").ToLowerInvariant());
+                        foreach (var b in bookings)
+                            bookingToPlate[b.Id] = carPlateMap.TryGetValue(b.CarId, out var p) ? p : "";
+                    }
                     invoices = invoices.Where(i =>
-                        (!string.IsNullOrWhiteSpace(i.CustomerPhone) && i.CustomerPhone.Contains(q)) ||
-                        (!string.IsNullOrWhiteSpace(i.CustomerName) && i.CustomerName.Contains(q)) ||
-                        (!string.IsNullOrWhiteSpace(i.InvoiceNumber) && i.InvoiceNumber.Contains(q))
-                    ).ToList();
+                    {
+                        var plateMatch = i.BookingId.HasValue && bookingToPlate.TryGetValue(i.BookingId.Value, out var plate) &&
+                            !string.IsNullOrEmpty(plate) && plate.Contains(qLower);
+                        return
+                            (!string.IsNullOrWhiteSpace(i.CustomerPhone) && i.CustomerPhone.Contains(q, StringComparison.OrdinalIgnoreCase)) ||
+                            (!string.IsNullOrWhiteSpace(i.CustomerName) && i.CustomerName.Contains(q, StringComparison.OrdinalIgnoreCase)) ||
+                            (!string.IsNullOrWhiteSpace(i.InvoiceNumber) && i.InvoiceNumber.Contains(q, StringComparison.OrdinalIgnoreCase)) ||
+                            plateMatch;
+                    }).ToList();
                 }
             }
 

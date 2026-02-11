@@ -267,7 +267,7 @@ namespace Forto.Application.Abstractions.Services.Bookings.Cashier.checkout
         //        PaidAt = inv.PaidAt,
         //        PaidByEmployeeId = inv.PaidByEmployeeId,
         //        Lines = inv.Lines?.Select(l => new InvoiceLineResponse
-        //        {
+        //           {
         //            Id = l.Id,
         //            Description = l.Description,
         //            Qty = l.Qty,
