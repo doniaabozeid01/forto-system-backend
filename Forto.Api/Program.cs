@@ -32,9 +32,11 @@ using Forto.Application.Abstractions.Services.Ops.Usage;
 using Forto.Application.Abstractions.Services.Schedule;
 using Forto.Application.Abstractions.Services.Shift;
 using Forto.Domain.Entities.Identity;
+using Forto.Api.Hubs;
 using Forto.Infrastructure.Data;
 using Forto.Infrastructure.Services;
 using Forto.Infrastructure.UnitOfWork;
+using Microsoft.AspNetCore.SignalR;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.AspNetCore.Identity;
 using Microsoft.AspNetCore.Mvc;
@@ -173,6 +175,8 @@ namespace Forto.Api
 
 
 
+            builder.Services.AddSignalR();
+
             // Learn more about configuring Swagger/OpenAPI at https://aka.ms/aspnetcore/swashbuckle
             builder.Services.AddEndpointsApiExplorer();
             //builder.Services.AddSwaggerGen();
@@ -228,6 +232,7 @@ namespace Forto.Api
 
             await IdentitySeeder.SeedRolesAsync(app.Services);
 
+            app.MapHub<InvoiceDeletionHub>("/hubs/invoice-deletion");
             app.MapControllers();
 
             app.Run();

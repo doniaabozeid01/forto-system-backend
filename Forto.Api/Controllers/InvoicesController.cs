@@ -1,3 +1,4 @@
+using Forto.Api.Hubs;
 using Forto.Application.Abstractions.Services.Invoices;
 using Forto.Application.Common;
 using Forto.Application.DTOs.Billings;
@@ -5,6 +6,7 @@ using Forto.Application.DTOs.Billings.cashier;
 using Forto.Application.DTOs.Billings.Gifts;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
+using Microsoft.AspNetCore.SignalR;
 using Microsoft.Extensions.Options;
 
 namespace Forto.Api.Controllers
@@ -14,11 +16,16 @@ namespace Forto.Api.Controllers
     {
         private readonly IInvoiceService _service;
         private readonly InvoiceDeletionLinkSettings _deletionLinkSettings;
+        private readonly IHubContext<InvoiceDeletionHub> _deletionHub;
 
-        public InvoicesController(IInvoiceService service, IOptions<InvoiceDeletionLinkSettings> deletionLinkOptions)
+        public InvoicesController(
+            IInvoiceService service,
+            IOptions<InvoiceDeletionLinkSettings> deletionLinkOptions,
+            IHubContext<InvoiceDeletionHub> deletionHub)
         {
             _service = service;
             _deletionLinkSettings = deletionLinkOptions?.Value ?? new InvoiceDeletionLinkSettings();
+            _deletionHub = deletionHub;
         }
 
 
@@ -144,6 +151,7 @@ namespace Forto.Api.Controllers
         public async Task<IActionResult> ApproveDeletion(int invoiceId)
         {
             var data = await _service.ApproveDeletionAsync(invoiceId);
+            await _deletionHub.Clients.All.SendAsync(InvoiceDeletionHub.EventName, invoiceId, "approved");
             return OkResponse(data, "Invoice deleted.");
         }
 
@@ -152,6 +160,7 @@ namespace Forto.Api.Controllers
         public async Task<IActionResult> RejectDeletion(int invoiceId)
         {
             var data = await _service.RejectDeletionAsync(invoiceId);
+            await _deletionHub.Clients.All.SendAsync(InvoiceDeletionHub.EventName, invoiceId, "rejected");
             return OkResponse(data, "Deletion rejected.");
         }
 
@@ -177,6 +186,7 @@ namespace Forto.Api.Controllers
                 if (string.Equals(action, "approve", StringComparison.OrdinalIgnoreCase))
                 {
                     await _service.ApproveDeletionAsync(invoiceId);
+                    await _deletionHub.Clients.All.SendAsync(InvoiceDeletionHub.EventName, invoiceId, "approved");
                     return Content(
                         "<html><body style='font-family: Arial; padding: 20px;'><h2>FORTO CAR CLEAN CENTER</h2><p style='color: green; font-size: 18px;'>تمت الموافقة على حذف الفاتورة.</p></body></html>",
                         "text/html; charset=utf-8");
@@ -184,6 +194,7 @@ namespace Forto.Api.Controllers
                 if (string.Equals(action, "reject", StringComparison.OrdinalIgnoreCase))
                 {
                     await _service.RejectDeletionAsync(invoiceId);
+                    await _deletionHub.Clients.All.SendAsync(InvoiceDeletionHub.EventName, invoiceId, "rejected");
                     return Content(
                         "<html><body style='font-family: Arial; padding: 20px;'><h2>FORTO CAR CLEAN CENTER</h2><p style='color: #b45309; font-size: 18px;'>تم رفض طلب الحذف.</p></body></html>",
                         "text/html; charset=utf-8");
