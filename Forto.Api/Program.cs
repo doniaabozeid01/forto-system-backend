@@ -21,7 +21,9 @@ using Forto.Application.Abstractions.Services.EmployeeServices;
 using Forto.Application.Abstractions.Services.Inventory.Materials;
 using Forto.Application.Abstractions.Services.Inventory.MaterialsCheck;
 using Forto.Application.Abstractions.Services.Inventory.Products;
+using Forto.Application.Abstractions.Services.Email;
 using Forto.Application.Abstractions.Services.Invoices;
+using Forto.Application.Common;
 using Forto.Application.Abstractions.Services.Ops.Products;
 using Forto.Application.Abstractions.Services.Ops.Products.StockMovement;
 using Forto.Application.Abstractions.Services.Ops.Stock;
@@ -31,6 +33,7 @@ using Forto.Application.Abstractions.Services.Schedule;
 using Forto.Application.Abstractions.Services.Shift;
 using Forto.Domain.Entities.Identity;
 using Forto.Infrastructure.Data;
+using Forto.Infrastructure.Services;
 using Forto.Infrastructure.UnitOfWork;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.AspNetCore.Identity;
@@ -128,6 +131,10 @@ namespace Forto.Api
                 });
 
             builder.Services.AddAuthorization();
+
+            builder.Services.Configure<EmailSettings>(builder.Configuration.GetSection(EmailSettings.SectionName));
+            builder.Services.Configure<InvoiceDeletionLinkSettings>(builder.Configuration.GetSection(InvoiceDeletionLinkSettings.SectionName));
+            builder.Services.AddScoped<IEmailSender, EmailSender>();
 
             builder.Services.AddScoped<IUnitOfWork, UnitOfWork>();
             builder.Services.AddScoped<IShiftService, ShiftService>();

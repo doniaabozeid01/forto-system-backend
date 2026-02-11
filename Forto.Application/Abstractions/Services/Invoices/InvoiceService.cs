@@ -1,5 +1,7 @@
 using Forto.Api.Common;
 using Forto.Application.Abstractions.Repositories;
+using Forto.Application.Abstractions.Services.Email;
+using Forto.Application.Common;
 using Forto.Application.DTOs.Billings;
 using Forto.Application.DTOs.Billings.cashier;
 using Forto.Application.DTOs.Billings.Gifts;
@@ -12,17 +14,23 @@ using Forto.Domain.Entities.Inventory;
 using Forto.Domain.Entities.Ops;
 using Forto.Domain.Enum;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.Options;
 using System.Linq;
 
 namespace Forto.Application.Abstractions.Services.Invoices
 {
     public class InvoiceService : IInvoiceService
     {
-                
         private readonly IUnitOfWork _uow;
+        private readonly IEmailSender _emailSender;
+        private readonly InvoiceDeletionLinkSettings _deletionLinkSettings;
 
-
-        public InvoiceService(IUnitOfWork uow) => _uow = uow;
+        public InvoiceService(IUnitOfWork uow, IEmailSender emailSender, IOptions<InvoiceDeletionLinkSettings> deletionLinkOptions)
+        {
+            _uow = uow;
+            _emailSender = emailSender;
+            _deletionLinkSettings = deletionLinkOptions?.Value ?? new InvoiceDeletionLinkSettings();
+        }
 
 
         /// <summary>يجيب الفاتورة بالـ bookingId. لو مفيش فاتورة، يعملها (Ensure) ويرجعها.</summary>
@@ -1014,8 +1022,8 @@ namespace Forto.Application.Abstractions.Services.Invoices
             CashAmount = inv.CashAmount,
             VisaAmount = inv.VisaAmount,
             InvoiceNumber=inv.InvoiceNumber,
-            ClientName = inv.CustomerName,
-            ClientNumber = inv.CustomerPhone,
+            ClientName = inv.CustomerName ?? "",
+            ClientNumber = inv.CustomerPhone ?? "",
             PlateNumber = "",
             Lines = inv.Lines.Select(l => new InvoiceLineResponse
             {
@@ -3203,7 +3211,9 @@ namespace Forto.Application.Abstractions.Services.Invoices
                     "paid" => InvoiceStatus.Paid,
                     "unpaid" => InvoiceStatus.Unpaid,
                     "cancelled" => InvoiceStatus.Cancelled,
-                    _ => throw new BusinessException("Invalid status. Use all | paid | unpaid | cancelled", 400)
+                    "pendingdeletion" => InvoiceStatus.PendingDeletion,
+                    "deleted" => InvoiceStatus.Deleted,
+                    _ => throw new BusinessException("Invalid status. Use all | paid | unpaid | cancelled | pendingdeletion | deleted", 400)
                 };
             }
 
@@ -3395,6 +3405,7 @@ namespace Forto.Application.Abstractions.Services.Invoices
                     CustomerName = customerName,
                     CustomerPhone = customerPhone,
                     PlateNumber = plateNumber,
+                    DeletionRejectedAt = inv.DeletionRejectedAt,
                     ItemsText = itemsText,
                     Lines = lineDtos
                 };
@@ -3415,7 +3426,106 @@ namespace Forto.Application.Abstractions.Services.Invoices
             };
         }
 
+        public async Task<InvoiceResponse> RequestDeletionAsync(int invoiceId, RequestInvoiceDeletionRequest request)
+        {
+            if (request == null || string.IsNullOrWhiteSpace(request.Reason))
+                throw new BusinessException("Reason is required for deletion request", 400);
 
+            var invRepo = _uow.Repository<Invoice>();
+            var inv = await invRepo.GetByIdAsync(invoiceId);
+            if (inv == null)
+                throw new BusinessException("Invoice not found", 404);
+            if (inv.Status == InvoiceStatus.Deleted)
+                throw new BusinessException("Invoice is already deleted", 409);
+            if (inv.Status == InvoiceStatus.PendingDeletion)
+                throw new BusinessException("Deletion already requested", 409);
+
+            var empRepo = _uow.Repository<Employee>();
+            var cashier = await empRepo.GetByIdAsync(request.CashierEmployeeId);
+            if (cashier == null || !cashier.IsActive)
+                throw new BusinessException("Cashier not found", 404);
+
+            var previousStatus = inv.Status;
+            inv.Status = InvoiceStatus.PendingDeletion;
+            inv.DeletionReason = request.Reason.Trim();
+            inv.DeletionRequestedAt = DateTime.UtcNow;
+            inv.DeletionRequestedByEmployeeId = request.CashierEmployeeId;
+            inv.DeletionRejectedAt = null;
+
+            invRepo.Update(inv);
+            await _uow.SaveChangesAsync();
+
+            var subject = $"طلب حذف فاتورة — {inv.InvoiceNumber}";
+            var baseUrl = (_deletionLinkSettings.BaseUrl ?? "").TrimEnd('/');
+            var secret = _deletionLinkSettings.Secret ?? "";
+            var approveToken = DeletionLinkToken.Generate(inv.Id, "approve", secret);
+            var rejectToken = DeletionLinkToken.Generate(inv.Id, "reject", secret);
+            var approveUrl = $"{baseUrl}/api/invoices/deletion/confirm?invoiceId={inv.Id}&action=approve&token={Uri.EscapeDataString(approveToken)}";
+            var rejectUrl = $"{baseUrl}/api/invoices/deletion/confirm?invoiceId={inv.Id}&action=reject&token={Uri.EscapeDataString(rejectToken)}";
+            var cashierName = cashier.Name ?? request.CashierEmployeeId.ToString();
+            var dateStr = inv.DeletionRequestedAt?.ToString("yyyy-MM-dd HH:mm") ?? "";
+            var htmlBody = $@"
+<div style='font-family: Arial, sans-serif; max-width: 500px;'>
+  <h2 style='color: #333;'>FORTO CAR CLEAN CENTER</h2>
+  <p>تم طلب حذف الفاتورة رقم <strong>{inv.InvoiceNumber}</strong>.</p>
+  <p><strong>السبب:</strong> {System.Net.WebUtility.HtmlEncode(inv.DeletionReason ?? "")}</p>
+  <p><strong>الكاشير:</strong> {System.Net.WebUtility.HtmlEncode(cashierName)}</p>
+  <p><strong>التاريخ:</strong> {dateStr}</p>
+  <p style='margin-top: 24px;'>
+    <a href='{approveUrl}' style='display: inline-block; background: #22c55e; color: white; padding: 12px 24px; text-decoration: none; border-radius: 6px; margin-left: 8px; font-weight: bold;'>ACCEPT</a>
+    <a href='{rejectUrl}' style='display: inline-block; background: #ef4444; color: white; padding: 12px 24px; text-decoration: none; border-radius: 6px; font-weight: bold;'>REJECT</a>
+  </p>
+</div>";
+            await _emailSender.SendHtmlToAdminAsync(subject, htmlBody);
+
+            var lines = await _uow.Repository<InvoiceLine>().FindAsync(l => l.InvoiceId == inv.Id);
+            inv.Lines = lines.ToList();
+            var response = Map(inv);
+            await FillPlateNumberAsync(inv, response);
+            return response;
+        }
+
+        public async Task<InvoiceResponse> ApproveDeletionAsync(int invoiceId)
+        {
+            var invRepo = _uow.Repository<Invoice>();
+            var inv = await invRepo.GetByIdAsync(invoiceId);
+            if (inv == null)
+                throw new BusinessException("Invoice not found", 404);
+            if (inv.Status != InvoiceStatus.PendingDeletion)
+                throw new BusinessException("Invoice is not pending deletion", 409);
+
+            inv.Status = InvoiceStatus.Deleted;
+            inv.DeletionRejectedAt = null;
+            invRepo.Update(inv);
+            await _uow.SaveChangesAsync();
+
+            var lines = await _uow.Repository<InvoiceLine>().FindAsync(l => l.InvoiceId == inv.Id);
+            inv.Lines = lines.ToList();
+            var response = Map(inv);
+            await FillPlateNumberAsync(inv, response);
+            return response;
+        }
+
+        public async Task<InvoiceResponse> RejectDeletionAsync(int invoiceId)
+        {
+            var invRepo = _uow.Repository<Invoice>();
+            var inv = await invRepo.GetByIdAsync(invoiceId);
+            if (inv == null)
+                throw new BusinessException("Invoice not found", 404);
+            if (inv.Status != InvoiceStatus.PendingDeletion)
+                throw new BusinessException("Invoice is not pending deletion", 409);
+
+            inv.Status = inv.PaidAt.HasValue ? InvoiceStatus.Paid : InvoiceStatus.Unpaid;
+            inv.DeletionRejectedAt = DateTime.UtcNow;
+            invRepo.Update(inv);
+            await _uow.SaveChangesAsync();
+
+            var lines = await _uow.Repository<InvoiceLine>().FindAsync(l => l.InvoiceId == inv.Id);
+            inv.Lines = lines.ToList();
+            var response = Map(inv);
+            await FillPlateNumberAsync(inv, response);
+            return response;
+        }
 
 
 

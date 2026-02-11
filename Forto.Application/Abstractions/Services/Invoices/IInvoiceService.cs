@@ -33,5 +33,11 @@ namespace Forto.Application.Abstractions.Services.Invoices
 
         Task<InvoiceListResponse> ListAsync(InvoiceListQuery query);
 
+        /// <summary>الكاشير يطلب حذف الفاتورة (سبب إجباري) — الفاتورة تبقى PendingDeletion ويتبعت إيميل للأدمن.</summary>
+        Task<InvoiceResponse> RequestDeletionAsync(int invoiceId, RequestInvoiceDeletionRequest request);
+        /// <summary>الأدمن يوافق على الحذف — الفاتورة تبقى Deleted.</summary>
+        Task<InvoiceResponse> ApproveDeletionAsync(int invoiceId);
+        /// <summary>الأدمن يرفض الحذف — الفاتورة ترجع لحالتها السابقة والكاشير يشوف "رفض الأدمن".</summary>
+        Task<InvoiceResponse> RejectDeletionAsync(int invoiceId);
     }
 }

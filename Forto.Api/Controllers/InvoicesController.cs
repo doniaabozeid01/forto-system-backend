@@ -1,9 +1,11 @@
 using Forto.Application.Abstractions.Services.Invoices;
+using Forto.Application.Common;
 using Forto.Application.DTOs.Billings;
 using Forto.Application.DTOs.Billings.cashier;
 using Forto.Application.DTOs.Billings.Gifts;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
+using Microsoft.Extensions.Options;
 
 namespace Forto.Api.Controllers
 {
@@ -11,8 +13,13 @@ namespace Forto.Api.Controllers
     public class InvoicesController : BaseApiController
     {
         private readonly IInvoiceService _service;
+        private readonly InvoiceDeletionLinkSettings _deletionLinkSettings;
 
-        public InvoicesController(IInvoiceService service) => _service = service;
+        public InvoicesController(IInvoiceService service, IOptions<InvoiceDeletionLinkSettings> deletionLinkOptions)
+        {
+            _service = service;
+            _deletionLinkSettings = deletionLinkOptions?.Value ?? new InvoiceDeletionLinkSettings();
+        }
 
 
         /// <summary>يجيب الفاتورة بالـ bookingId. لو مفيش فاتورة تُنشأ تلقائياً ثم تُرجَع (ما عدا لو الحجز ملغى أو غير موجود).</summary>
@@ -122,9 +129,75 @@ namespace Forto.Api.Controllers
             return OkResponse(data, "OK");
         }
 
+        /// <summary>الكاشير يطلب حذف الفاتورة — سبب إجباري. الفاتورة تبقى PendingDeletion ويُرسل إيميل للأدمن.</summary>
+        [HttpPost("{invoiceId:int}/request-deletion")]
+        public async Task<IActionResult> RequestDeletion(int invoiceId, [FromBody] RequestInvoiceDeletionRequest request)
+        {
+            if (request == null)
+                return FailResponse("Request body required", 400);
+            var data = await _service.RequestDeletionAsync(invoiceId, request);
+            return OkResponse(data, "Deletion requested; admin will be notified.");
+        }
 
+        /// <summary>الأدمن يوافق على حذف الفاتورة — تصبح Deleted.</summary>
+        [HttpPost("{invoiceId:int}/deletion/approve")]
+        public async Task<IActionResult> ApproveDeletion(int invoiceId)
+        {
+            var data = await _service.ApproveDeletionAsync(invoiceId);
+            return OkResponse(data, "Invoice deleted.");
+        }
 
+        /// <summary>الأدمن يرفض طلب الحذف — الفاتورة ترجع لحالتها والكاشير يشوف "رفض الأدمن".</summary>
+        [HttpPost("{invoiceId:int}/deletion/reject")]
+        public async Task<IActionResult> RejectDeletion(int invoiceId)
+        {
+            var data = await _service.RejectDeletionAsync(invoiceId);
+            return OkResponse(data, "Deletion rejected.");
+        }
 
+        /// <summary>رابط من الإيميل — الموافقة أو الرفض بالضغط على ACCEPT/REJECT. لا يتطلب تسجيل دخول.</summary>
+        [HttpGet("deletion/confirm")]
+        public async Task<IActionResult> ConfirmDeletion([FromQuery] int invoiceId, [FromQuery] string? action, [FromQuery] string? token)
+        {
+            if (invoiceId <= 0 || string.IsNullOrEmpty(action) || string.IsNullOrEmpty(token))
+            {
+                return Content(
+                    "<html><body style='font-family: Arial; padding: 20px;'><h2>FORTO CAR CLEAN CENTER</h2><p>رابط غير صالح أو منتهي الصلاحية.</p></body></html>",
+                    "text/html; charset=utf-8");
+            }
+            var secret = _deletionLinkSettings.Secret ?? "";
+            if (!DeletionLinkToken.Validate(invoiceId, action, token, secret))
+            {
+                return Content(
+                    "<html><body style='font-family: Arial; padding: 20px;'><h2>FORTO CAR CLEAN CENTER</h2><p>رابط غير صالح أو منتهي الصلاحية.</p></body></html>",
+                    "text/html; charset=utf-8");
+            }
+            try
+            {
+                if (string.Equals(action, "approve", StringComparison.OrdinalIgnoreCase))
+                {
+                    await _service.ApproveDeletionAsync(invoiceId);
+                    return Content(
+                        "<html><body style='font-family: Arial; padding: 20px;'><h2>FORTO CAR CLEAN CENTER</h2><p style='color: green; font-size: 18px;'>تمت الموافقة على حذف الفاتورة.</p></body></html>",
+                        "text/html; charset=utf-8");
+                }
+                if (string.Equals(action, "reject", StringComparison.OrdinalIgnoreCase))
+                {
+                    await _service.RejectDeletionAsync(invoiceId);
+                    return Content(
+                        "<html><body style='font-family: Arial; padding: 20px;'><h2>FORTO CAR CLEAN CENTER</h2><p style='color: #b45309; font-size: 18px;'>تم رفض طلب الحذف.</p></body></html>",
+                        "text/html; charset=utf-8");
+                }
+            }
+            catch (Exception)
+            {
+                return Content(
+                    "<html><body style='font-family: Arial; padding: 20px;'><h2>FORTO CAR CLEAN CENTER</h2><p style='color: red;'>حدث خطأ. قد تكون الفاتورة تمت معالجتها مسبقاً.</p></body></html>",
+                    "text/html; charset=utf-8");
+            }
+            return Content(
+                "<html><body style='font-family: Arial; padding: 20px;'><h2>FORTO CAR CLEAN CENTER</h2><p>رابط غير صالح.</p></body></html>",
+                "text/html; charset=utf-8");
+        }
     }
-
 }

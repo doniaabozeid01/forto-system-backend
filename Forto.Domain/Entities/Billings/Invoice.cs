@@ -38,6 +38,14 @@ namespace Forto.Domain.Entities.Billings
         public decimal TaxRate { get; set; } = 0.14m; // 14%
         public decimal TaxAmount { get; set; }       // محسوبة
 
+        /// <summary>سبب طلب الحذف من الكاشير.</summary>
+        public string? DeletionReason { get; set; }
+        /// <summary>وقت طلب الحذف.</summary>
+        public DateTime? DeletionRequestedAt { get; set; }
+        /// <summary>موظف الكاشير اللي طلب الحذف.</summary>
+        public int? DeletionRequestedByEmployeeId { get; set; }
+        /// <summary>لو الأدمن رفض الحذف — وقت الرفض (عشان الكاشير يشوف "رفض الأدمن").</summary>
+        public DateTime? DeletionRejectedAt { get; set; }
 
         public ICollection<InvoiceLine> Lines { get; set; } = new List<InvoiceLine>();
     }

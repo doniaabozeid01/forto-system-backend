@@ -42,6 +42,8 @@ public class InvoiceListItemDto
     public InvoiceStatus? status { get; set; }
     /// <summary>تاريخ ووقت الدفع إن وُجد.</summary>
     public DateTime? PaidAt { get; set; }
+    /// <summary>لو الأدمن رفض طلب الحذف — وقت الرفض (عشان تعرض "رفض الأدمن").</summary>
+    public DateTime? DeletionRejectedAt { get; set; }
     public string CustomerName { get; set; } = "";
     public string CustomerPhone { get; set; } = "";
     /// <summary>رقم لوحة العربية من الحجز.</summary>
