@@ -78,11 +78,11 @@ namespace Forto.Api.Controllers
 
             var user = await _userManager.Users.FirstOrDefaultAsync(u => u.PhoneNumber == phone);
             if (user == null)
-                return Unauthorized(new { message = "Invalid credentials" });
+                return Unauthorized(new { message = "رقم الهاتف او كلمه المرور غير صحيحه" });
 
             var ok = await _userManager.CheckPasswordAsync(user, req.Password);
             if (!ok)
-                return Unauthorized(new { message = "Invalid credentials" });
+                return Unauthorized(new { message = "رقم الهاتف او كلمه المرور غير صحيحه" });
 
             var roles = await _userManager.GetRolesAsync(user);
             var role = roles.FirstOrDefault() ?? "client";
