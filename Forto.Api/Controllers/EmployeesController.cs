@@ -32,10 +32,11 @@ namespace Forto.Api.Controllers
             return OkResponse(data);
         }
 
+        /// <summary>المشرفين. اختياري: shiftId = يرجع فقط اللي شغالين في الشيفت ده النهاردة.</summary>
         [HttpGet("supervisors")]
-        public async Task<IActionResult> GetSupervisors()
+        public async Task<IActionResult> GetSupervisors([FromQuery] int? shiftId = null)
         {
-            var data = await _employeeService.GetSupervisorsAsync();
+            var data = await _employeeService.GetSupervisorsAsync(shiftId);
             return OkResponse(data);
         }
 

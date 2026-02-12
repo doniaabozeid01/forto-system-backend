@@ -31,6 +31,7 @@ using Forto.Application.Abstractions.Services.Ops.Stock.StockMovement;
 using Forto.Application.Abstractions.Services.Ops.Usage;
 using Forto.Application.Abstractions.Services.Schedule;
 using Forto.Application.Abstractions.Services.Shift;
+using Forto.Application.Abstractions.Services.CashierShift;
 using Forto.Domain.Entities.Identity;
 using Forto.Api.Hubs;
 using Forto.Infrastructure.Data;
@@ -140,6 +141,7 @@ namespace Forto.Api
 
             builder.Services.AddScoped<IUnitOfWork, UnitOfWork>();
             builder.Services.AddScoped<IShiftService, ShiftService>();
+            builder.Services.AddScoped<ICashierShiftService, CashierShiftService>();
             builder.Services.AddScoped<IEmployeeService, EmployeeService>();
             builder.Services.AddScoped<IEmployeeScheduleService, EmployeeScheduleService>();
             builder.Services.AddScoped<IClientService, ClientService>();
@@ -231,6 +233,7 @@ namespace Forto.Api
             app.UseCors("AllowFortoOrigins");
 
             await IdentitySeeder.SeedRolesAsync(app.Services);
+            await DataSeeder.SeedAsync(app.Services);
 
             app.MapHub<InvoiceDeletionHub>("/hubs/invoice-deletion");
             app.MapControllers();

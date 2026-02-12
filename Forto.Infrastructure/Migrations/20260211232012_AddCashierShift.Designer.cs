@@ -4,6 +4,7 @@ using Forto.Infrastructure.Data;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Infrastructure;
 using Microsoft.EntityFrameworkCore.Metadata;
+using Microsoft.EntityFrameworkCore.Migrations;
 using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 
 #nullable disable
@@ -11,9 +12,11 @@ using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 namespace Forto.Infrastructure.Migrations
 {
     [DbContext(typeof(FortoDbContext))]
-    partial class FortoDbContextModelSnapshot : ModelSnapshot
+    [Migration("20260211232012_AddCashierShift")]
+    partial class AddCashierShift
     {
-        protected override void BuildModel(ModelBuilder modelBuilder)
+        /// <inheritdoc />
+        protected override void BuildTargetModel(ModelBuilder modelBuilder)
         {
 #pragma warning disable 612, 618
             modelBuilder
@@ -1194,9 +1197,6 @@ namespace Forto.Infrastructure.Migrations
                     b.Property<int>("OpenedByEmployeeId")
                         .HasColumnType("int");
 
-                    b.Property<int?>("ShiftId")
-                        .HasColumnType("int");
-
                     b.Property<DateTime?>("UpdatedAt")
                         .HasColumnType("datetime2");
 
@@ -1207,8 +1207,6 @@ namespace Forto.Infrastructure.Migrations
                     b.HasIndex("ClosedByEmployeeId");
 
                     b.HasIndex("OpenedByEmployeeId");
-
-                    b.HasIndex("ShiftId");
 
                     b.ToTable("CashierShifts", "ops");
                 });
@@ -1765,18 +1763,11 @@ namespace Forto.Infrastructure.Migrations
                         .OnDelete(DeleteBehavior.Restrict)
                         .IsRequired();
 
-                    b.HasOne("Forto.Domain.Entities.Employees.Shift", "Shift")
-                        .WithMany()
-                        .HasForeignKey("ShiftId")
-                        .OnDelete(DeleteBehavior.NoAction);
-
                     b.Navigation("Branch");
 
                     b.Navigation("ClosedByEmployee");
 
                     b.Navigation("OpenedByEmployee");
-
-                    b.Navigation("Shift");
                 });
 
             modelBuilder.Entity("Forto.Domain.Entities.Ops.MaterialMovement", b =>

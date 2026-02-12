@@ -138,10 +138,6 @@ namespace Forto.Api.Controllers
 
 
 
-
-
-
-
         /// <summary>الكاشير يطلب حذف الفاتورة — سبب إجباري. الفاتورة تبقى PendingDeletion ويُرسل إيميل للأدمن.</summary>
         [HttpPost("{invoiceId:int}/request-deletion")]
         public async Task<IActionResult> RequestDeletion(int invoiceId, [FromBody] RequestInvoiceDeletionRequest request)

@@ -13,7 +13,8 @@ namespace Forto.Application.Abstractions.Services.Employees
         Task<EmployeeResponse> CreateAsync(CreateEmployeeRequest request);
         Task<EmployeeResponse?> GetByIdAsync(int id);
         Task<IReadOnlyList<EmployeeResponse>> GetAllAsync();
-        Task<IReadOnlyList<EmployeeResponse>> GetSupervisorsAsync();
+        /// <summary>المشرفين. اختياري: shiftId = يرجع فقط اللي شغالين في الشيفت ده النهاردة (من جدول الدوام).</summary>
+        Task<IReadOnlyList<EmployeeResponse>> GetSupervisorsAsync(int? shiftId = null);
         Task<EmployeeResponse?> UpdateAsync(int id, UpdateEmployeeRequest request);
         Task<bool> DeleteAsync(int id);
         Task<EmployeeResponse> CreateEmployeeUserAsync(CreateEmployeeUserRequest req);

@@ -190,9 +190,8 @@ namespace Forto.Application.Abstractions.Services.Catalogs.Service
             };
         }
 
-        public async Task<IReadOnlyList<EmployeeResponse>> GetEmployeesForServiceAsync(int serviceId)
+        public async Task<IReadOnlyList<EmployeeResponse>> GetEmployeesForServiceAsync(int serviceId, int? shiftId = null)
         {
-            // تأكد الخدمة موجودة (اختياري بس لطيف)
             var serviceRepo = _uow.Repository<Domain.Entities.Catalog.Service>();
             var service = await serviceRepo.GetByIdAsync(serviceId);
             if (service == null)
@@ -201,14 +200,27 @@ namespace Forto.Application.Abstractions.Services.Catalogs.Service
             var linkRepo = _uow.Repository<EmployeeService>();
             var employeeRepo = _uow.Repository<Employee>();
 
-            // هات الروابط الفعالة
             var links = await linkRepo.FindAsync(x => x.ServiceId == serviceId && x.IsActive);
-
-            var employeeIds = links.Select(x => x.EmployeeId).Distinct().ToList();
+            var employeeIds = links.Select(x => x.EmployeeId ).Distinct().ToList();
             if (employeeIds.Count == 0)
                 return new List<EmployeeResponse>();
 
-            var employees = await employeeRepo.FindAsync(e => employeeIds.Contains(e.Id) && e.IsActive);
+            // لو shiftId مُمرّر: فلتر بالعاملين في الشيفت ده النهاردة (من جدول الدوام)
+            if (shiftId.HasValue)
+            {
+                var scheduleRepo = _uow.Repository<EmployeeWorkSchedule>();
+                var today = DateTime.UtcNow.DayOfWeek;
+                var schedules = await scheduleRepo.FindAsync(s =>
+                    employeeIds.Contains(s.EmployeeId) &&
+                    s.DayOfWeek == today &&
+                    s.ShiftId == shiftId.Value &&
+                    !s.IsOff && !s.IsDeleted);
+                employeeIds = schedules.Select(s => s.EmployeeId).Distinct().ToList();
+                if (employeeIds.Count == 0)
+                    return new List<EmployeeResponse>();
+            }
+
+            var employees = await employeeRepo.FindAsync(e => employeeIds.Contains(e.Id) && e.IsActive && e.Role == EmployeeRole.Worker);
 
             return employees
                 .OrderBy(e => e.Name)
@@ -437,9 +449,10 @@ namespace Forto.Application.Abstractions.Services.Catalogs.Service
                 .GroupBy(i => i.AssignedEmployeeId!.Value)
                 .ToDictionary(g => g.Key, g => g.First().BookingId);
 
-            // 4) load employee names
-            var employees = await empRepo.FindAsync(e => workingIds.Contains(e.Id) && e.IsActive);
+            // 4) عمال فقط (Worker) — لا كاشير ولا مشرف ولا أدمن
+            var employees = await empRepo.FindAsync(e => workingIds.Contains(e.Id) && e.IsActive && e.Role == EmployeeRole.Worker);
             var empNameMap = employees.ToDictionary(e => e.Id, e => e.Name);
+            var workerIdsOnly = empNameMap.Keys.ToHashSet();
 
             var resp = new EmployeeAvailabilityResponse
             {
@@ -448,7 +461,7 @@ namespace Forto.Application.Abstractions.Services.Catalogs.Service
                 SlotHourStart = slotHourStart
             };
 
-            foreach (var empId in workingIds.OrderBy(x => x))
+            foreach (var empId in workerIdsOnly.OrderBy(x => x))
             {
                 empNameMap.TryGetValue(empId, out var name);
                 name ??= "";

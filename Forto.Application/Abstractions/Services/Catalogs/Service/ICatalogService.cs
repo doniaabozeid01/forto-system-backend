@@ -15,7 +15,8 @@ namespace Forto.Application.Abstractions.Services.Catalogs.Service
         Task<IReadOnlyList<ServiceResponse>> GetServicesAsync(int? categoryId = null);
         Task<ServiceResponse?> UpsertRatesAsync(int serviceId, UpsertServiceRatesRequest request);
         Task<bool> DeleteServiceAsync(int id);
-        Task<IReadOnlyList<EmployeeResponse>> GetEmployeesForServiceAsync(int serviceId);
+        /// <summary>العمال اللي بيعملوا الخدمة. لو shiftId مُمرّر يرجع فقط اللي شغالين في الشيفت ده (من جدول الدوام، يوم اليوم).</summary>
+        Task<IReadOnlyList<EmployeeResponse>> GetEmployeesForServiceAsync(int serviceId, int? shiftId = null);
         Task<EmployeeAvailabilityResponse> GetEmployeesForServiceAtAsync(
             int bookingId,
             int serviceId,

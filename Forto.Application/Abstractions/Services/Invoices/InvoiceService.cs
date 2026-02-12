@@ -1,5 +1,6 @@
 using Forto.Api.Common;
 using Forto.Application.Abstractions.Repositories;
+using Forto.Application.Abstractions.Services.CashierShift;
 using Forto.Application.Abstractions.Services.Email;
 using Forto.Application.Common;
 using Forto.Application.DTOs.Billings;
@@ -24,12 +25,14 @@ namespace Forto.Application.Abstractions.Services.Invoices
         private readonly IUnitOfWork _uow;
         private readonly IEmailSender _emailSender;
         private readonly InvoiceDeletionLinkSettings _deletionLinkSettings;
+        private readonly ICashierShiftService _cashierShiftService;
 
-        public InvoiceService(IUnitOfWork uow, IEmailSender emailSender, IOptions<InvoiceDeletionLinkSettings> deletionLinkOptions)
+        public InvoiceService(IUnitOfWork uow, IEmailSender emailSender, IOptions<InvoiceDeletionLinkSettings> deletionLinkOptions, ICashierShiftService cashierShiftService)
         {
             _uow = uow;
             _emailSender = emailSender;
             _deletionLinkSettings = deletionLinkOptions?.Value ?? new InvoiceDeletionLinkSettings();
+            _cashierShiftService = cashierShiftService;
         }
 
 
@@ -837,6 +840,13 @@ namespace Forto.Application.Abstractions.Services.Invoices
             inv.VisaAmount = visa;
             inv.PaidByEmployeeId = cashierId;
             inv.PaidAt = DateTime.UtcNow;
+
+            if (inv.BranchId.HasValue)
+            {
+                var activeShift = await _cashierShiftService.GetActiveForBranchAsync(inv.BranchId.Value);
+                if (activeShift != null)
+                    inv.CashierShiftId = activeShift.Id;
+            }
 
             invRepo.Update(inv);
             await _uow.SaveChangesAsync();
@@ -3243,7 +3253,8 @@ namespace Forto.Application.Abstractions.Services.Invoices
                 (fromDateOnly == null || DateOnly.FromDateTime(i.PaidAt ?? i.CreatedAt) >= fromDateOnly) &&
                 (toDateOnly == null || DateOnly.FromDateTime(i.PaidAt ?? i.CreatedAt) <= toDateOnly) &&
                 (statusFilter == null || i.Status == statusFilter) &&
-                (paymentMethodFilter == null || i.PaymentMethod == paymentMethodFilter)
+                (paymentMethodFilter == null || i.PaymentMethod == paymentMethodFilter) &&
+                (query.CashierShiftId == null || i.CashierShiftId == query.CashierShiftId)
             );
 
             // ===============================
@@ -3467,6 +3478,7 @@ namespace Forto.Application.Abstractions.Services.Invoices
                     CustomerPhone = customerPhone,
                     PlateNumber = plateNumber,
                     DeletionRejectedAt = inv.DeletionRejectedAt,
+                    CashierShiftId = inv.CashierShiftId,
                     ItemsText = itemsText,
                     Lines = lineDtos
                 };

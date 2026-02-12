@@ -63,10 +63,11 @@ namespace Forto.Api.Controllers
         }
 
 
+        /// <summary>العمال اللي بيعملوا الخدمة. اختياري: shiftId = فلتر بالعاملين في الشيفت ده النهاردة.</summary>
         [HttpGet("{id:int}/employees")]
-        public async Task<IActionResult> GetEmployeesByAServiceId(int id)
+        public async Task<IActionResult> GetEmployeesByAServiceId(int id, [FromQuery] int? shiftId = null)
         {
-            var data = await _service.GetEmployeesForServiceAsync(id);
+            var data = await _service.GetEmployeesForServiceAsync(id, shiftId);
             return OkResponse(data, "OK");
         }
 

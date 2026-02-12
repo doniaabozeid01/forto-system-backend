@@ -1,5 +1,6 @@
 using Forto.Api.Common;
 using Forto.Application.Abstractions.Repositories;
+using Forto.Application.Abstractions.Services.CashierShift;
 using Forto.Application.Abstractions.Services.Invoices;
 using Forto.Application.DTOs.Billings;
 using Forto.Application.DTOs.Bookings.cashier.checkout;
@@ -26,17 +27,20 @@ namespace Forto.Application.Abstractions.Services.Bookings.Cashier.checkout
             private readonly IBookingService _bookingService;
             private readonly IBookingLifecycleService _lifecycle;
             private readonly IInvoiceService _invoiceService;
+            private readonly ICashierShiftService _cashierShiftService;
 
             public CashierCheckoutService(
                 IUnitOfWork uow,
                 IBookingService bookingService,
                 IBookingLifecycleService lifecycle,
-                IInvoiceService invoiceService)
+                IInvoiceService invoiceService,
+                ICashierShiftService cashierShiftService)
             {
                 _uow = uow;
                 _bookingService = bookingService;
                 _lifecycle = lifecycle;
                 _invoiceService = invoiceService;
+                _cashierShiftService = cashierShiftService;
             }
 
 
@@ -677,6 +681,14 @@ namespace Forto.Application.Abstractions.Services.Bookings.Cashier.checkout
             invoice.VisaAmount = visa;
             invoice.PaidByEmployeeId = cashierId;
             invoice.PaidAt = paidAt;
+
+            // ربط الفاتورة بالشيفت النشط للفرع (لو فيه شيفت مفتوح)
+            if (invoice.BranchId.HasValue)
+            {
+                var activeShift = await _cashierShiftService.GetActiveForBranchAsync(invoice.BranchId.Value);
+                if (activeShift != null)
+                    invoice.CashierShiftId = activeShift.Id;
+            }
 
             invRepo.Update(invoice);
             await _uow.SaveChangesAsync();

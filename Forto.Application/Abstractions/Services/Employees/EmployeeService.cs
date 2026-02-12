@@ -152,10 +152,27 @@ namespace Forto.Application.Abstractions.Services.Employees
             return employees.Select(Map).ToList();
         }
 
-        public async Task<IReadOnlyList<EmployeeResponse>> GetSupervisorsAsync()
+        public async Task<IReadOnlyList<EmployeeResponse>> GetSupervisorsAsync(int? shiftId = null)
         {
             var repo = _uow.Repository<Employee>();
             var supervisors = await repo.FindAsync(e => !e.IsDeleted && e.Role == Domain.Enum.EmployeeRole.Supervisor && e.IsActive);
+            if (supervisors.Count == 0)
+                return new List<EmployeeResponse>();
+
+            if (shiftId.HasValue)
+            {
+                var scheduleRepo = _uow.Repository<EmployeeWorkSchedule>();
+                var today = DateTime.UtcNow.DayOfWeek;
+                var supervisorIds = supervisors.Select(s => s.Id).ToList();
+                var schedules = await scheduleRepo.FindAsync(s =>
+                    supervisorIds.Contains(s.EmployeeId) &&
+                    s.DayOfWeek == today &&
+                    s.ShiftId == shiftId.Value &&
+                    !s.IsOff && !s.IsDeleted);
+                var idsInShift = schedules.Select(s => s.EmployeeId).Distinct().ToHashSet();
+                supervisors = supervisors.Where(e => idsInShift.Contains(e.Id)).ToList();
+            }
+
             return supervisors.Select(Map).ToList();
         }
 

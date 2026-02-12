@@ -19,6 +19,9 @@ namespace Forto.Application.DTOs.Billings
 
         public string? status { get; set; }
 
+        /// <summary>فلتر بـ وردية الكاشير: لو محدد تعرض فقط الفواتير اللي اتدفت في الوردية دي.</summary>
+        public int? CashierShiftId { get; set; }
+
         public int Page { get; set; } = 1;
         public int PageSize { get; set; } = 20;
     }

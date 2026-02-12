@@ -47,6 +47,10 @@ namespace Forto.Domain.Entities.Billings
         /// <summary>لو الأدمن رفض الحذف — وقت الرفض (عشان الكاشير يشوف "رفض الأدمن").</summary>
         public DateTime? DeletionRejectedAt { get; set; }
 
+        /// <summary>شيفت الكاشير اللي اتدفع فيها الفاتورة (لو مدفوعة أثناء شيفت مفتوح).</summary>
+        public int? CashierShiftId { get; set; }
+        public CashierShift? CashierShift { get; set; }
+
         public ICollection<InvoiceLine> Lines { get; set; } = new List<InvoiceLine>();
     }
 

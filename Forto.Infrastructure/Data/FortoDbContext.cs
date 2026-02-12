@@ -136,6 +136,28 @@ namespace Forto.Infrastructure.Data
 
 
             modelBuilder.Entity<Branch>().ToTable("Branches", "ops");
+            modelBuilder.Entity<CashierShift>().ToTable("CashierShifts", "ops");
+
+            modelBuilder.Entity<CashierShift>()
+                .HasOne(x => x.Branch)
+                .WithMany()
+                .HasForeignKey(x => x.BranchId)
+                .OnDelete(DeleteBehavior.Restrict);
+            modelBuilder.Entity<CashierShift>()
+                .HasOne(x => x.OpenedByEmployee)
+                .WithMany()
+                .HasForeignKey(x => x.OpenedByEmployeeId)
+                .OnDelete(DeleteBehavior.Restrict);
+            modelBuilder.Entity<CashierShift>()
+                .HasOne(x => x.ClosedByEmployee)
+                .WithMany()
+                .HasForeignKey(x => x.ClosedByEmployeeId)
+                .OnDelete(DeleteBehavior.NoAction);
+            modelBuilder.Entity<CashierShift>()
+                .HasOne(x => x.Shift)
+                .WithMany()
+                .HasForeignKey(x => x.ShiftId)
+                .OnDelete(DeleteBehavior.NoAction);
 
             modelBuilder.Entity<Booking>().ToTable("Bookings", "booking");
             modelBuilder.Entity<BookingItem>().ToTable("BookingItems", "booking");
@@ -601,6 +623,11 @@ namespace Forto.Infrastructure.Data
     .HasForeignKey(x => x.ClientId)
     .OnDelete(DeleteBehavior.NoAction);
 
+            modelBuilder.Entity<Invoice>()
+                .HasOne(x => x.CashierShift)
+                .WithMany()
+                .HasForeignKey(x => x.CashierShiftId)
+                .OnDelete(DeleteBehavior.NoAction);
 
 
 

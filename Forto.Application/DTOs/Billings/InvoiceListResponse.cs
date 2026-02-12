@@ -52,6 +52,8 @@ public class InvoiceListItemDto
     public DateTime? PaidAt { get; set; }
     /// <summary>لو الأدمن رفض طلب الحذف — وقت الرفض (عشان تعرض "رفض الأدمن").</summary>
     public DateTime? DeletionRejectedAt { get; set; }
+    /// <summary>وردية الكاشير اللي اتدفت فيها الفاتورة (لو اتدفت أثناء وردية مفتوحة).</summary>
+    public int? CashierShiftId { get; set; }
     public string CustomerName { get; set; } = "";
     public string CustomerPhone { get; set; } = "";
     /// <summary>رقم لوحة العربية من الحجز.</summary>
