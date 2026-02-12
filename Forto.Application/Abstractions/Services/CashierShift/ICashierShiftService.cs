@@ -1,3 +1,4 @@
+using System;
 using System.Threading.Tasks;
 using Forto.Application.DTOs.CashierShifts;
 
@@ -17,5 +18,8 @@ namespace Forto.Application.Abstractions.Services.CashierShift
 
         /// <summary>العمال/المشرفين اللي في الوردية: من جدول الدوام حسب الشيفت (صباحي/مسائي) ويوم فتح الوردية. لو الوردية مش مربوطة بشيفت يرجع قائمة فاضية.</summary>
         Task<IReadOnlyList<CashierShiftEmployeeDto>> GetEmployeesForCashierShiftAsync(int cashierShiftId);
+
+        /// <summary>ملخص ورديات يوم معيّن: الورديات اللي اتفتحت في اليوم ده + مين مسئول عن كل وردية + إجمالي المبيعات والكاش والفيزا والخصومات.</summary>
+        Task<DailyShiftsSummaryResponse> GetDailyShiftsSummaryAsync(DateTime date);
     }
 }

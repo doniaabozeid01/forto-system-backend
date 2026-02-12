@@ -16,6 +16,15 @@ namespace Forto.Api.Controllers
             _cashierShiftService = cashierShiftService;
         }
 
+        /// <summary>ملخص ورديات يوم معيّن: ابعت التاريخ (مثلاً date=2026-02-12) يجيب كل الورديات اللي اتفتحت النهارده، مين مسئول عن كل وردية، وإجمالي المبيعات والكاش والفيزا والخصومات لكل وردية. لو متبعتش date يستخدم تاريخ اليوم.</summary>
+        [HttpGet("summary")]
+        public async Task<IActionResult> GetDailySummary([FromQuery] DateTime? date)
+        {
+            var targetDate = date?.Date ?? DateTime.UtcNow.Date;
+            var summary = await _cashierShiftService.GetDailyShiftsSummaryAsync(targetDate);
+            return OkResponse(summary, "OK");
+        }
+
         /// <summary>جلب الشيفت النشط للفرع (لو الكاشير مسجل دخول وعايز يعرف هل فيه شيفت مفتوح ويظهر زرار "ابدأ الشيفت" أو حالة الشيفت).</summary>
         [HttpGet("active")]
         public async Task<IActionResult> GetActive([FromQuery] int branchId)

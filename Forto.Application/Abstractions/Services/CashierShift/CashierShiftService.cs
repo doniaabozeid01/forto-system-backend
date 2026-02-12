@@ -5,6 +5,7 @@ using System.Threading.Tasks;
 using Forto.Api.Common;
 using Forto.Application.Abstractions.Repositories;
 using Forto.Application.DTOs.CashierShifts;
+using Forto.Domain.Entities.Billings;
 using Forto.Domain.Entities.Employees;
 using Forto.Domain.Entities.Ops;
 using Forto.Domain.Enum;
@@ -150,6 +151,84 @@ namespace Forto.Application.Abstractions.Services.CashierShift
                 ClosedAt = entity.ClosedAt,
                 IsActive = !entity.ClosedAt.HasValue
             };
+        }
+
+        public async Task<DailyShiftsSummaryResponse> GetDailyShiftsSummaryAsync(DateTime date)
+        {
+            var startOfDay = date.Date;
+            var endOfDay = startOfDay.AddDays(1);
+
+            var shiftRepo = _uow.Repository<CashierShiftEntity>();
+            var shifts = await shiftRepo.FindAsync(s =>
+                !s.IsDeleted && s.OpenedAt >= startOfDay && s.OpenedAt < endOfDay);
+            var shiftList = shifts.ToList();
+            if (shiftList.Count == 0)
+                return new DailyShiftsSummaryResponse { Date = startOfDay };
+
+            var shiftIds = shiftList.Select(s => s.Id).ToList();
+            var invoiceRepo = _uow.Repository<Invoice>();
+            var invoices = await invoiceRepo.FindAsync(i =>
+                i.CashierShiftId != null && shiftIds.Contains(i.CashierShiftId.Value) &&
+                i.Status == InvoiceStatus.Paid && !i.IsDeleted);
+            var invoiceList = invoices.ToList();
+
+            var byShift = invoiceList
+                .GroupBy(i => i.CashierShiftId!.Value)
+                .ToDictionary(g => g.Key, g => new
+                {
+                    TotalSales = g.Sum(i => i.Total),
+                    Cash = g.Sum(i => i.CashAmount ?? 0),
+                    Visa = g.Sum(i => i.VisaAmount ?? 0),
+                    Discounts = g.Sum(i => i.Discount)
+                });
+
+            var empRepo = _uow.Repository<Employee>();
+            var branchRepo = _uow.Repository<Branch>();
+            var hrShiftRepo = _uow.Repository<HrShift>();
+            var result = new DailyShiftsSummaryResponse { Date = startOfDay };
+            decimal totalSales = 0, totalCash = 0, totalVisa = 0, totalDiscounts = 0;
+
+            foreach (var s in shiftList.OrderBy(s => s.OpenedAt))
+            {
+                var stats = byShift.GetValueOrDefault(s.Id);
+                var totalSalesS = stats?.TotalSales ?? 0;
+                var cashS = stats?.Cash ?? 0;
+                var visaS = stats?.Visa ?? 0;
+                var discountsS = stats?.Discounts ?? 0;
+                totalSales += totalSalesS;
+                totalCash += cashS;
+                totalVisa += visaS;
+                totalDiscounts += discountsS;
+
+                var openedBy = await empRepo.GetByIdAsync(s.OpenedByEmployeeId);
+                var branch = await branchRepo.GetByIdAsync(s.BranchId);
+                HrShift? hrShift = null;
+                if (s.ShiftId.HasValue)
+                    hrShift = await hrShiftRepo.GetByIdAsync(s.ShiftId.Value);
+                result.Shifts.Add(new DailyShiftSummaryItemDto
+                {
+                    ShiftNumber = s.ShiftId,
+                    ShiftName = hrShift?.Name,
+                    CashierShiftId = s.Id,
+                    BranchId = s.BranchId,
+                    BranchName = branch?.Name,
+                    OpenedAt = s.OpenedAt,
+                    ClosedAt = s.ClosedAt,
+                    ResponsibleEmployeeId = s.OpenedByEmployeeId,
+                    ResponsibleEmployeeName = openedBy?.Name,
+                    TotalSales = totalSalesS,
+                    CashAmount = cashS,
+                    VisaAmount = visaS,
+                    TotalDiscounts = discountsS,
+                    IsActive = !s.ClosedAt.HasValue
+                });
+            }
+
+            result.TotalSalesForDay = totalSales;
+            result.TotalCashForDay = totalCash;
+            result.TotalVisaForDay = totalVisa;
+            result.TotalDiscountsForDay = totalDiscounts;
+            return result;
         }
 
         private async Task RequireCashierAsync(int employeeId)
