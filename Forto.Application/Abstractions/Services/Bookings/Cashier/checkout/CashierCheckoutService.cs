@@ -383,71 +383,72 @@ namespace Forto.Application.Abstractions.Services.Bookings.Cashier.checkout
             invRepo.Update(invoice);
 
             // 5) إضافة الهدايا من الـ request (قبل المنتجات) — بعد الـ Complete والفاتورة جاهزة
-            //if (request.Gifts != null && request.Gifts.Count > 0)
-            //{
-            //    await AddGiftsFromCheckoutRequestAsync(invoice.Id, booking.Id, request.Gifts, request.CashierId);
-            //    await _uow.SaveChangesAsync();
-            //    await RecalcInvoiceFromAllLinesAsync(invoice.Id);
-            //}
-
-            // 6) Add products to same invoice (optional) + recalc totals from ALL lines
-            if (request.Products != null && request.Products.Count > 0)
+            if (request.GiftId != null)
             {
-                var products = request.Products
-                    .Select(p => new PosProductItemDto { ProductId = p.ProductId, Qty = p.Qty })
-                    .ToList();
-
-                await AddProductsToInvoiceAsync(invoice, request.CashierId, products);
-                // AddProductsToInvoiceAsync will SaveChanges and update invoice totals
-            }
-            else
-            {
-                // ✅ even لو مفيش منتجات: تأكد totals = sum(lines) + VAT
+                await AddGiftsFromCheckoutRequestAsync(invoice.Id, booking.Id, request.GiftId, request.CashierId);
+                await _uow.SaveChangesAsync();
                 await RecalcInvoiceFromAllLinesAsync(invoice.Id);
             }
 
-            // ✅ تعديل المجموع قبل الضريبة من الكاشير — الـ Total يُحسب: AdjustedTotal + (AdjustedTotal × 14%) - Discount
-            if (request.AdjustedTotal.HasValue)
-            {
-                var invForAdjust = await invRepo.GetByIdAsync(invoice.Id);
-                if (invForAdjust != null)
+            // 6) Add products to same invoice (optional) + recalc totals from ALL lines
+            if (request.Products != null && request.Products.Count > 0)
                 {
-                    invForAdjust.AdjustedTotal = request.AdjustedTotal.Value;
-                    var effectiveSubTotal = request.AdjustedTotal.Value;
-                    invForAdjust.TaxAmount = Math.Round(effectiveSubTotal * invForAdjust.TaxRate, 2);
-                    invForAdjust.Total = effectiveSubTotal + invForAdjust.TaxAmount - invForAdjust.Discount;
-                    if (invForAdjust.Total < 0) invForAdjust.Total = 0;
-                    invRepo.Update(invForAdjust);
-                    await _uow.SaveChangesAsync();
+                    var products = request.Products
+                        .Select(p => new PosProductItemDto { ProductId = p.ProductId, Qty = p.Qty })
+                        .ToList();
+
+                    await AddProductsToInvoiceAsync(invoice, request.CashierId, products);
+                    // AddProductsToInvoiceAsync will SaveChanges and update invoice totals
                 }
-            }
-
-            // 7) Pay immediately (Paid) + تسجيل طريقة الدفع ومبالغ كاش/فيزا
-            await PayInvoiceCashAsync(invoice.Id, request.CashierId, DateTime.UtcNow,
-                request.PaymentMethod, request.CashAmount, request.VisaAmount);
-
-            // 8) return fresh invoice + lines + رقم العربية
-            var fresh = await invRepo.GetByIdAsync(invoice.Id);
-            if (fresh == null) throw new BusinessException("Invoice not found", 404);
-
-            var lines = await lineRepo.FindAsync(l => l.InvoiceId == fresh.Id);
-            fresh.Lines = lines.ToList();
-
-            var response = MapInvoice(fresh);
-            if (fresh.BookingId.HasValue)
-            {
-                var bookingForPlate = await _uow.Repository<Booking>().GetByIdAsync(fresh.BookingId.Value);
-                if (bookingForPlate != null)
+                else
                 {
-                    var car = await _uow.Repository<Car>().GetByIdAsync(bookingForPlate.CarId);
-                    response.PlateNumber = car?.PlateNumber ?? "";
+                    // ✅ even لو مفيش منتجات: تأكد totals = sum(lines) + VAT
+                    await RecalcInvoiceFromAllLinesAsync(invoice.Id);
                 }
-            }
-            return response;
+
+                // ✅ تعديل المجموع قبل الضريبة من الكاشير — الـ Total يُحسب: AdjustedTotal + (AdjustedTotal × 14%) - Discount
+                if (request.AdjustedTotal.HasValue)
+                {
+                    var invForAdjust = await invRepo.GetByIdAsync(invoice.Id);
+                    if (invForAdjust != null)
+                    {
+                        invForAdjust.AdjustedTotal = request.AdjustedTotal.Value;
+                        var effectiveSubTotal = request.AdjustedTotal.Value;
+                        invForAdjust.TaxAmount = Math.Round(effectiveSubTotal * invForAdjust.TaxRate, 2);
+                        invForAdjust.Total = effectiveSubTotal + invForAdjust.TaxAmount - invForAdjust.Discount;
+                        if (invForAdjust.Total < 0) invForAdjust.Total = 0;
+                        invRepo.Update(invForAdjust);
+                        await _uow.SaveChangesAsync();
+                    }
+                }
+
+                // 7) Pay immediately (Paid) + تسجيل طريقة الدفع ومبالغ كاش/فيزا
+                await PayInvoiceCashAsync(invoice.Id, request.CashierId, DateTime.UtcNow,
+                    request.PaymentMethod, request.CashAmount, request.VisaAmount);
+
+                // 8) return fresh invoice + lines + رقم العربية
+                var fresh = await invRepo.GetByIdAsync(invoice.Id);
+                if (fresh == null) throw new BusinessException("Invoice not found", 404);
+
+                var lines = await lineRepo.FindAsync(l => l.InvoiceId == fresh.Id);
+                fresh.Lines = lines.ToList();
+
+                var response = MapInvoice(fresh);
+                if (fresh.BookingId.HasValue)
+                {
+                    var bookingForPlate = await _uow.Repository<Booking>().GetByIdAsync(fresh.BookingId.Value);
+                    if (bookingForPlate != null)
+                    {
+                        var car = await _uow.Repository<Car>().GetByIdAsync(bookingForPlate.CarId);
+                        response.PlateNumber = car?.PlateNumber ?? "";
+                    }
+                }
+                return response;
+            
         }
 
 
-        // ----------------- helpers ----------------- //
+        // ---------------------- helpers ---------------------- //
         private async Task RequireCashierAsync(int cashierId)
         {
             var empRepo = _uow.Repository<Employee>();
@@ -471,9 +472,118 @@ namespace Forto.Application.Abstractions.Services.Bookings.Cashier.checkout
         }
 
         /// <summary>إضافة الهدايا من طلب الـ checkout — المنتج لازم يكون من خيارات الهدايا للخدمات المكتملة.</summary>
-        private async Task AddGiftsFromCheckoutRequestAsync(int invoiceId, int bookingId, List<CashierGiftItemDto> gifts, int cashierId)
+        //private async Task AddGiftsFromCheckoutRequestAsync(int invoiceId, int bookingId, int giftId, int cashierId)
+        //{
+        //    if (gifts == null || gifts.Count == 0) return;
+
+        //    var invRepo = _uow.Repository<Invoice>();
+        //    var lineRepo = _uow.Repository<InvoiceLine>();
+        //    var bookingRepo = _uow.Repository<Booking>();
+        //    var itemRepo = _uow.Repository<BookingItem>();
+        //    var giftOptRepo = _uow.Repository<ServiceGiftOption>();
+        //    var redemptionRepo = _uow.Repository<BookingGiftRedemption>();
+        //    var productRepo = _uow.Repository<Product>();
+        //    var stockRepo = _uow.Repository<BranchProductStock>();
+        //    var moveRepo = _uow.Repository<ProductMovement>();
+
+        //    var invoice = await invRepo.GetByIdAsync(invoiceId);
+        //    if (invoice == null) throw new BusinessException("Invoice not found", 404);
+        //    if (invoice.Status != InvoiceStatus.Unpaid)
+        //        throw new BusinessException("Invoice must be Unpaid to add gifts", 409);
+
+        //    var booking = await bookingRepo.GetByIdAsync(bookingId);
+        //    if (booking == null) throw new BusinessException("Booking not found", 404);
+
+        //    var doneItems = await itemRepo.FindAsync(i => i.BookingId == bookingId && i.Status == BookingItemStatus.Done);
+        //    var serviceIds = doneItems.Select(i => i.ServiceId).Distinct().ToList();
+        //    if (serviceIds.Count == 0)
+        //        throw new BusinessException("No completed services to unlock gifts", 409);
+
+        //    var branchId = booking.BranchId;
+        //    var occurredAt = DateTime.UtcNow;
+
+        //    foreach (var g in gifts)
+        //    {
+        //        var isAllowed = await giftOptRepo.AnyAsync(o =>
+        //            o.IsActive && o.ProductId == g.ProductId && serviceIds.Contains(o.ServiceId));
+        //        if (!isAllowed)
+        //            throw new BusinessException($"Product {g.ProductId} is not an available gift for this booking", 409);
+
+        //        var product = await productRepo.GetByIdAsync(g.ProductId);
+        //        if (product == null || !product.IsActive)
+        //            throw new BusinessException($"Product {g.ProductId} not found", 404);
+
+        //        var stock = (await stockRepo.FindTrackingAsync(s => s.BranchId == branchId && s.ProductId == g.ProductId)).FirstOrDefault();
+        //        if (stock == null)
+        //            throw new BusinessException($"Gift product {g.ProductId} stock not found in this branch", 409);
+        //        var available = stock.OnHandQty - stock.ReservedQty;
+        //        if (available < 0) available = 0;
+        //        if (available < 1)
+        //            throw new BusinessException($"Gift product {g.ProductId} out of stock", 409);
+
+        //        stock.OnHandQty -= 1;
+        //        stockRepo.Update(stock);
+
+        //        var invLine = new InvoiceLine
+        //        {
+        //            InvoiceId = invoiceId,
+        //            LineType = InvoiceLineType.Gift,
+        //            Description = $"هدية: {product.Name}",
+        //            Qty = 1,
+        //            UnitPrice = 0,
+        //            Total = 0
+        //        };
+        //        await lineRepo.AddAsync(invLine);
+        //        await _uow.SaveChangesAsync();
+
+        //        await moveRepo.AddAsync(new ProductMovement
+        //        {
+        //            BranchId = branchId,
+        //            ProductId = product.Id,
+        //            MovementType = ProductMovementType.Gift,
+        //            Qty = 1,
+        //            UnitCostSnapshot = product.CostPerUnit,
+        //            TotalCost = product.CostPerUnit,
+        //            OccurredAt = occurredAt,
+        //            InvoiceId = invoiceId,
+        //            BookingId = bookingId,
+        //            BookingItemId = null,
+        //            RecordedByEmployeeId = cashierId,
+        //            Notes = "Gift from checkout"
+        //        });
+
+        //        await redemptionRepo.AddAsync(new BookingGiftRedemption
+        //        {
+        //            BookingId = bookingId,
+        //            ProductId = product.Id,
+        //            InvoiceId = invoiceId,
+        //            InvoiceLineId = invLine.Id,
+        //            SelectedByCashierId = cashierId,
+        //            OccurredAt = occurredAt,
+        //            Notes = "Gift from checkout"
+        //        });
+        //    }
+        //}
+
+
+
+
+
+
+
+
+
+
+
+
+
+        /// <summary>
+        /// إضافة هدية واحدة من طلب الـ checkout — giftId هو Id بتاع ServiceGiftOption
+        /// وبيتم التحقق إن الخيار مرتبط بخدمة مكتملة داخل نفس الحجز.
+        /// </summary>
+        private async Task AddGiftFromCheckoutRequestAsync (int invoiceId, int bookingId, int giftId, int cashierId)
         {
-            if (gifts == null || gifts.Count == 0) return;
+            if (giftId <= 0) return;
 
             var invRepo = _uow.Repository<Invoice>();
             var lineRepo = _uow.Repository<InvoiceLine>();
@@ -501,68 +611,235 @@ namespace Forto.Application.Abstractions.Services.Bookings.Cashier.checkout
             var branchId = booking.BranchId;
             var occurredAt = DateTime.UtcNow;
 
-            foreach (var g in gifts)
+            // 1) هات GiftOption نفسه بالـ Id
+            var opt = await giftOptRepo.GetByIdAsync(giftId);
+            if (opt == null || !opt.IsActive)
+                throw new BusinessException($"Gift option {giftId} not found or inactive", 404);
+
+            // 2) لازم يكون مرتبط بخدمة مكتملة في الحجز
+            if (!serviceIds.Contains(opt.ServiceId))
+                throw new BusinessException($"Gift option {giftId} is not allowed for this booking", 409);
+
+            // 3) هات المنتج من opt.ProductId
+            var product = await productRepo.GetByIdAsync(opt.ProductId);
+            if (product == null || !product.IsActive)
+                throw new BusinessException($"Product {opt.ProductId} not found", 404);
+
+            // 4) stock check + decrement
+            var stock = (await stockRepo.FindTrackingAsync(s => s.BranchId == branchId && s.ProductId == product.Id))
+                .FirstOrDefault();
+
+            if (stock == null)
+                throw new BusinessException($"Gift product {product.Id} stock not found in this branch", 409);
+
+            var available = stock.OnHandQty - stock.ReservedQty;
+            if (available < 0) available = 0;
+
+            if (available < 1)
+                throw new BusinessException($"Gift product {product.Id} out of stock", 409);
+
+            stock.OnHandQty -= 1;
+            stockRepo.Update(stock);
+
+            // 5) invoice line
+            var invLine = new InvoiceLine
             {
-                var isAllowed = await giftOptRepo.AnyAsync(o =>
-                    o.IsActive && o.ProductId == g.ProductId && serviceIds.Contains(o.ServiceId));
-                if (!isAllowed)
-                    throw new BusinessException($"Product {g.ProductId} is not an available gift for this booking", 409);
+                InvoiceId = invoiceId,
+                LineType = InvoiceLineType.Gift,
+                Description = $"هدية: {product.Name}",
+                Qty = 1,
+                UnitPrice = 0,
+                Total = 0
+            };
 
-                var product = await productRepo.GetByIdAsync(g.ProductId);
-                if (product == null || !product.IsActive)
-                    throw new BusinessException($"Product {g.ProductId} not found", 404);
+            await lineRepo.AddAsync(invLine);
+            await _uow.SaveChangesAsync(); // عشان invLine.Id
 
-                var stock = (await stockRepo.FindTrackingAsync(s => s.BranchId == branchId && s.ProductId == g.ProductId)).FirstOrDefault();
-                if (stock == null)
-                    throw new BusinessException($"Gift product {g.ProductId} stock not found in this branch", 409);
-                var available = stock.OnHandQty - stock.ReservedQty;
-                if (available < 0) available = 0;
-                if (available < 1)
-                    throw new BusinessException($"Gift product {g.ProductId} out of stock", 409);
+            // 6) movement
+            await moveRepo.AddAsync(new ProductMovement
+            {
+                BranchId = branchId,
+                ProductId = product.Id,
+                MovementType = ProductMovementType.Gift,
+                Qty = 1,
+                UnitCostSnapshot = product.CostPerUnit,
+                TotalCost = product.CostPerUnit,
+                OccurredAt = occurredAt,
+                InvoiceId = invoiceId,
+                BookingId = bookingId,
+                BookingItemId = null,
+                RecordedByEmployeeId = cashierId,
+                Notes = $"Gift from checkout (GiftOptionId={giftId})"
+            });
 
-                stock.OnHandQty -= 1;
-                stockRepo.Update(stock);
+            // 7) redemption
+            await redemptionRepo.AddAsync(new BookingGiftRedemption
+            {
+                BookingId = bookingId,
+                ProductId = product.Id,
+                InvoiceId = invoiceId,
+                InvoiceLineId = invLine.Id,
+                SelectedByCashierId = cashierId,
+                OccurredAt = occurredAt,
+                Notes = $"Gift from checkout (GiftOptionId={giftId})"
+            });
 
-                var invLine = new InvoiceLine
-                {
-                    InvoiceId = invoiceId,
-                    LineType = InvoiceLineType.Gift,
-                    Description = $"Gift: {product.Name}",
-                    Qty = 1,
-                    UnitPrice = 0,
-                    Total = 0
-                };
-                await lineRepo.AddAsync(invLine);
-                await _uow.SaveChangesAsync();
-
-                await moveRepo.AddAsync(new ProductMovement
-                {
-                    BranchId = branchId,
-                    ProductId = product.Id,
-                    MovementType = ProductMovementType.Gift,
-                    Qty = 1,
-                    UnitCostSnapshot = product.CostPerUnit,
-                    TotalCost = product.CostPerUnit,
-                    OccurredAt = occurredAt,
-                    InvoiceId = invoiceId,
-                    BookingId = bookingId,
-                    BookingItemId = null,
-                    RecordedByEmployeeId = cashierId,
-                    Notes = "Gift from checkout"
-                });
-
-                await redemptionRepo.AddAsync(new BookingGiftRedemption
-                {
-                    BookingId = bookingId,
-                    ProductId = product.Id,
-                    InvoiceId = invoiceId,
-                    InvoiceLineId = invLine.Id,
-                    SelectedByCashierId = cashierId,
-                    OccurredAt = occurredAt,
-                    Notes = "Gift from checkout"
-                });
-            }
+            await _uow.SaveChangesAsync();
         }
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+        //    private async Task AddGiftFromCheckoutRequestAsync(
+        //int invoiceId,
+        //int bookingId,
+        //int giftId,
+        //int cashierId)
+        //    {
+        //        if (giftId == null) return;
+
+        //        var invRepo = _uow.Repository<Invoice>();
+        //        var lineRepo = _uow.Repository<InvoiceLine>();
+        //        var bookingRepo = _uow.Repository<Booking>();
+        //        var itemRepo = _uow.Repository<BookingItem>();
+        //        var giftOptRepo = _uow.Repository<ServiceGiftOption>();
+        //        var redemptionRepo = _uow.Repository<BookingGiftRedemption>();
+        //        var productRepo = _uow.Repository<Product>();
+        //        var stockRepo = _uow.Repository<BranchProductStock>();
+        //        var moveRepo = _uow.Repository<ProductMovement>();
+
+        //        var invoice = await invRepo.GetByIdAsync(invoiceId);
+        //        if (invoice == null) throw new BusinessException("Invoice not found", 404);
+        //        if (invoice.Status != InvoiceStatus.Unpaid)
+        //            throw new BusinessException("Invoice must be Unpaid to add gifts", 409);
+
+        //        var booking = await bookingRepo.GetByIdAsync(bookingId);
+        //        if (booking == null) throw new BusinessException("Booking not found", 404);
+
+        //        var doneItems = await itemRepo.FindAsync(i => i.BookingId == bookingId && i.Status == BookingItemStatus.Done);
+        //        var serviceIds = doneItems.Select(i => i.ServiceId).Distinct().ToList();
+        //        if (serviceIds.Count == 0)
+        //            throw new BusinessException("No completed services to unlock gifts", 409);
+
+        //        var branchId = booking.BranchId;
+        //        var occurredAt = DateTime.UtcNow;
+
+        //        // 1) validate gift allowed for any completed service
+        //        var isAllowed = await giftOptRepo.AnyAsync(o =>
+        //            o.IsActive && o.ProductId == gift.ProductId && serviceIds.Contains(o.ServiceId));
+
+        //        if (!isAllowed)
+        //            throw new BusinessException($"Product {gift.ProductId} is not an available gift for this booking", 409);
+
+        //        // 2) validate product
+        //        var product = await productRepo.GetByIdAsync(gift.ProductId);
+        //        if (product == null || !product.IsActive)
+        //            throw new BusinessException($"Product {gift.ProductId} not found", 404);
+
+        //        // 3) stock check + decrement
+        //        var stock = (await stockRepo.FindTrackingAsync(s => s.BranchId == branchId && s.ProductId == gift.ProductId))
+        //            .FirstOrDefault();
+
+        //        if (stock == null)
+        //            throw new BusinessException($"Gift product {gift.ProductId} stock not found in this branch", 409);
+
+        //        var available = stock.OnHandQty - stock.ReservedQty;
+        //        if (available < 0) available = 0;
+
+        //        if (available < 1)
+        //            throw new BusinessException($"Gift product {gift.ProductId} out of stock", 409);
+
+        //        stock.OnHandQty -= 1;
+        //        stockRepo.Update(stock);
+
+        //        // 4) invoice line
+        //        var invLine = new InvoiceLine
+        //        {
+        //            InvoiceId = invoiceId,
+        //            LineType = InvoiceLineType.Gift,
+        //            Description = $"هدية: {product.Name}",
+        //            Qty = 1,
+        //            UnitPrice = 0,
+        //            Total = 0
+        //        };
+
+        //        await lineRepo.AddAsync(invLine);
+        //        await _uow.SaveChangesAsync(); // عشان invLine.Id يتولد
+
+        //        // 5) movement
+        //        await moveRepo.AddAsync(new ProductMovement
+        //        {
+        //            BranchId = branchId,
+        //            ProductId = product.Id,
+        //            MovementType = ProductMovementType.Gift,
+        //            Qty = 1,
+        //            UnitCostSnapshot = product.CostPerUnit,
+        //            TotalCost = product.CostPerUnit,
+        //            OccurredAt = occurredAt,
+        //            InvoiceId = invoiceId,
+        //            BookingId = bookingId,
+        //            BookingItemId = null,
+        //            RecordedByEmployeeId = cashierId,
+        //            Notes = "Gift from checkout"
+        //        });
+
+        //        // 6) redemption
+        //        await redemptionRepo.AddAsync(new BookingGiftRedemption
+        //        {
+        //            BookingId = bookingId,
+        //            ProductId = product.Id,
+        //            InvoiceId = invoiceId,
+        //            InvoiceLineId = invLine.Id,
+        //            SelectedByCashierId = cashierId,
+        //            OccurredAt = occurredAt,
+        //            Notes = "Gift from checkout"
+        //        });
+
+        //        await _uow.SaveChangesAsync();
+        //    }
+
+
+
+
+
+
 
         private class PosProductItemDto
         {
@@ -613,9 +890,10 @@ namespace Forto.Application.Abstractions.Services.Bookings.Cashier.checkout
                 await lineRepo.AddAsync(new InvoiceLine
                 {
                     InvoiceId = invoice.Id,
-                    Description = $"Product: {p.Name}",
+                    Description = $"منتج: {p.Name}",
                     Qty = 1, // لو عايزة qty تظهر صح هنغير InvoiceLine.Qty لـ decimal بعدين
                     UnitPrice = p.SalePrice,
+                    LineType = InvoiceLineType.Product,
                     Total = lineTotal
                 });
 
