@@ -136,7 +136,15 @@ namespace Forto.Api.Controllers
             return OkResponse(data, "OK");
         }
 
-
+        /// <summary>تقرير المنتجات المبيعة والمتحاسب عليها: ادّي from و to (تاريخ) يرجع المنتجات المتباعة، كل منتج بكام، وفي فاتورة رقم كام، والمجموع الكلي.</summary>
+        [HttpGet("reports/sold-products")]
+        public async Task<IActionResult> GetSoldProductsReport([FromQuery] DateTime from, [FromQuery] DateTime to)
+        {
+            if (from > to)
+                return FailResponse("From date must be before or equal to To date", 400);
+            var data = await _service.GetSoldProductsReportAsync(from, to);
+            return OkResponse(data, "OK");
+        }
 
         /// <summary>الكاشير يطلب حذف الفاتورة — سبب إجباري. الفاتورة تبقى PendingDeletion ويُرسل إيميل للأدمن.</summary>
         [HttpPost("{invoiceId:int}/request-deletion")]

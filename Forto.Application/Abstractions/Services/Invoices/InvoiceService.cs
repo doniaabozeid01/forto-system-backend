@@ -3501,6 +3501,58 @@ namespace Forto.Application.Abstractions.Services.Invoices
             };
         }
 
+        public async Task<SoldProductsReportResponse> GetSoldProductsReportAsync(DateTime fromDate, DateTime toDate)
+        {
+            var fromStart = fromDate.Date;
+            var toEnd = toDate.Date.AddDays(1);
+
+            var invRepo = _uow.Repository<Invoice>();
+            var lineRepo = _uow.Repository<InvoiceLine>();
+
+            var invoices = await invRepo.FindAsync(i =>
+                i.Status == InvoiceStatus.Paid &&
+                i.PaidAt.HasValue &&
+                i.PaidAt.Value >= fromStart &&
+                i.PaidAt.Value < toEnd);
+
+            var invoiceList = invoices.ToList();
+            if (invoiceList.Count == 0)
+                return new SoldProductsReportResponse { FromDate = fromStart, ToDate = toDate.Date };
+
+            var invoiceIds = invoiceList.Select(i => i.Id).ToList();
+            var invNumberById = invoiceList.ToDictionary(i => i.Id, i => i.InvoiceNumber ?? i.Id.ToString());
+
+            var lines = await lineRepo.FindAsync(l =>
+                invoiceIds.Contains(l.InvoiceId) && l.LineType == InvoiceLineType.Product);
+
+            var items = new List<SoldProductItemDto>();
+            decimal grandTotal = 0;
+            foreach (var line in lines.OrderBy(l => l.InvoiceId).ThenBy(l => l.Id))
+            {
+                var invNumber = invNumberById.TryGetValue(line.InvoiceId, out var num) ? num : line.InvoiceId.ToString();
+                var inv = invoiceList.FirstOrDefault(i => i.Id == line.InvoiceId);
+                items.Add(new SoldProductItemDto
+                {
+                    ProductDescription = line.Description ?? "",
+                    UnitPrice = line.UnitPrice,
+                    Qty = line.Qty,
+                    LineTotal = line.Total,
+                    InvoiceNumber = invNumber,
+                    InvoiceId = line.InvoiceId,
+                    PaidAt = inv?.PaidAt
+                });
+                grandTotal += line.Total;
+            }
+
+            return new SoldProductsReportResponse
+            {
+                FromDate = fromStart,
+                ToDate = toDate.Date,
+                Items = items,
+                GrandTotal = grandTotal
+            };
+        }
+
         public async Task<InvoiceResponse> RequestDeletionAsync(int invoiceId, RequestInvoiceDeletionRequest request)
         {
             if (request == null || string.IsNullOrWhiteSpace(request.Reason))
