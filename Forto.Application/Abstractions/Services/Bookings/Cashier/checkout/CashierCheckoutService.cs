@@ -385,7 +385,7 @@ namespace Forto.Application.Abstractions.Services.Bookings.Cashier.checkout
             // 5) إضافة الهدايا من الـ request (قبل المنتجات) — بعد الـ Complete والفاتورة جاهزة
             if (request.GiftId != null)
             {
-                await AddGiftsFromCheckoutRequestAsync(invoice.Id, booking.Id, request.GiftId, request.CashierId);
+                await AddGiftFromCheckoutRequestAsync(invoice.Id, booking.Id, request.GiftId, request.CashierId);
                 await _uow.SaveChangesAsync();
                 await RecalcInvoiceFromAllLinesAsync(invoice.Id);
             }
