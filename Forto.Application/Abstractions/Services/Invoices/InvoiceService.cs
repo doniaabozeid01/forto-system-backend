@@ -2141,6 +2141,14 @@ namespace Forto.Application.Abstractions.Services.Invoices
             if (branch == null || !branch.IsActive)
                 throw new BusinessException("Branch not found", 404);
 
+            // ✅ التحقق من وردية الكاشير لو مُرسلة (نفس الفرع)
+            if (request.CashierShiftId.HasValue)
+            {
+                var shift = await _uow.Repository<Forto.Domain.Entities.Ops.CashierShift>().GetByIdAsync(request.CashierShiftId.Value);
+                if (shift == null || shift.BranchId != request.BranchId)
+                    throw new BusinessException("Cashier shift not found or does not belong to this branch", 400);
+            }
+
             if (request.Items == null || request.Items.Count == 0)
                 throw new BusinessException("Items is required", 400);
 
@@ -2231,10 +2239,12 @@ namespace Forto.Application.Abstractions.Services.Invoices
 
                 Discount = 0,
                 Status = InvoiceStatus.Paid,
-                PaymentMethod = PaymentMethod.Cash,
+                PaymentMethod = request.PaymentMethod,
                 PaidByEmployeeId = request.CashierId,
                 PaidAt = occurred,
                 InvoiceNumber="for",
+                CashierShiftId = request.CashierShiftId,
+
                 // totals will be set later
                 SubTotal = 0,
                 Total = 0
@@ -2268,9 +2278,10 @@ namespace Forto.Application.Abstractions.Services.Invoices
                 {
                     InvoiceId = invoice.Id,
                     Description = $"Product: {p.Name}",
-                    Qty = it.Qty, // لاحقًا نغيّرها لو عايزة qty تظهر
+                    Qty = it.Qty,
                     UnitPrice = p.SalePrice,
-                    Total = lineTotal
+                    Total = lineTotal,
+                    LineType = InvoiceLineType.Product
                 });
 
                 await moveRepo.AddAsync(new ProductMovement
@@ -2293,6 +2304,22 @@ namespace Forto.Application.Abstractions.Services.Invoices
             // ✅ round subtotal then VAT totals
             subTotal = Math.Round(subTotal, 2);
             RecalcInvoiceTotals(invoice, subTotal);
+
+            // ✅ تعديل المجموع قبل الضريبة من الكاشير (إن وُجد)
+            if (request.AdjustedTotal.HasValue)
+            {
+                invoice.AdjustedTotal = request.AdjustedTotal.Value;
+                var effectiveSubTotal = request.AdjustedTotal.Value;
+                invoice.TaxAmount = Math.Round(effectiveSubTotal * invoice.TaxRate, 2);
+                invoice.Total = effectiveSubTotal + invoice.TaxAmount - invoice.Discount;
+                if (invoice.Total < 0) invoice.Total = 0;
+            }
+
+            // ✅ تسجيل مبالغ كاش/فيزا حسب طريقة الدفع
+            var (cash, visa) = ResolveCashVisaAmounts(request.PaymentMethod, invoice.Total, request.CashAmount, request.VisaAmount);
+            invoice.CashAmount = cash;
+            invoice.VisaAmount = visa;
+
             invRepo.Update(invoice);
 
             // ✅ Save #2: save everything (invoice number + totals + lines + stock + movements)
@@ -3309,6 +3336,18 @@ namespace Forto.Application.Abstractions.Services.Invoices
             var totalVisaAmount = paidInvoices.Sum(i => i.VisaAmount ?? 0);
 
             // ===============================
+            // إجمالي مبيعات المنتجات منفصل (بنود نوع Product فقط)
+            // ===============================
+            decimal totalProductRevenue = 0;
+            if (paidInvoices.Count > 0)
+            {
+                var paidInvoiceIds = paidInvoices.Select(i => i.Id).ToList();
+                var productLines = await lineRepo.FindAsync(l =>
+                    paidInvoiceIds.Contains(l.InvoiceId) && l.LineType == InvoiceLineType.Product);
+                totalProductRevenue = productLines.Sum(l => l.Total);
+            }
+
+            // ===============================
             // Cost & profit (تكلفة من مواد + منتجات، ربح = إيراد − تكلفة)
             // ===============================
             var allBookingIds = invoices.Where(i => i.BookingId.HasValue).Select(i => i.BookingId!.Value).Distinct().ToList();
@@ -3357,6 +3396,7 @@ namespace Forto.Application.Abstractions.Services.Invoices
                     {
                         TotalCount = totalCount,
                         TotalRevenue = totalRevenue,
+                        TotalProductRevenue = totalProductRevenue,
                         TotalCashAmount = totalCashAmount,
                         TotalVisaAmount = totalVisaAmount,
                         TotalCost = totalCost,
@@ -3490,6 +3530,7 @@ namespace Forto.Application.Abstractions.Services.Invoices
                 {
                     TotalCount = totalCount,
                     TotalRevenue = totalRevenue,
+                    TotalProductRevenue = totalProductRevenue,
                     TotalCashAmount = totalCashAmount,
                     TotalVisaAmount = totalVisaAmount,
                     TotalCost = totalCost,

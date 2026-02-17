@@ -20,6 +20,8 @@ namespace Forto.Application.DTOs.Billings
     {
         public int TotalCount { get; set; }
         public decimal TotalRevenue { get; set; }
+        /// <summary>إجمالي مبيعات المنتجات فقط (منفصل عن إجمالي الإيراد).</summary>
+        public decimal TotalProductRevenue { get; set; }
         /// <summary>إجمالي مبالغ الدفع كاش.</summary>
         public decimal TotalCashAmount { get; set; }
         /// <summary>إجمالي مبالغ الدفع فيزا.</summary>
