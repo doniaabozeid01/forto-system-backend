@@ -23,6 +23,17 @@ namespace Forto.Application.DTOs.Dashboard
         public decimal ProductsAdjustNet { get; set; }
 
         public decimal TotalCosts { get; set; }
+
+        /// <summary>ربح التشغيل = الإيراد المدفوع − إجمالي التكاليف (بدون فروقات الجرد).</summary>
+        public decimal OperatingProfit { get; set; }
+
+        /// <summary>فروقات الجرد = صافي تعديلات المواد + صافي تعديلات المنتجات. معروضة منفصلة ولا تدخل في ربح التشغيل.</summary>
+        public decimal InventoryVariance { get; set; }
+
+        /// <summary>الصافي المحاسبي النهائي (اختياري) = ربح التشغيل + فروقات الجرد.</summary>
+        public decimal FinalAccountingNet { get; set; }
+
+        /// <summary>يساوي ربح التشغيل (للتوافق مع الاستخدام السابق؛ الاعتماد على OperatingProfit موصى به).</summary>
         public decimal NetProfit { get; set; }
     }
 
