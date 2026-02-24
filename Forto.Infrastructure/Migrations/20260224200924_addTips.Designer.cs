@@ -4,6 +4,7 @@ using Forto.Infrastructure.Data;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Infrastructure;
 using Microsoft.EntityFrameworkCore.Metadata;
+using Microsoft.EntityFrameworkCore.Migrations;
 using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 
 #nullable disable
@@ -11,9 +12,11 @@ using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 namespace Forto.Infrastructure.Migrations
 {
     [DbContext(typeof(FortoDbContext))]
-    partial class FortoDbContextModelSnapshot : ModelSnapshot
+    [Migration("20260224200924_addTips")]
+    partial class addTips
     {
-        protected override void BuildModel(ModelBuilder modelBuilder)
+        /// <inheritdoc />
+        protected override void BuildTargetModel(ModelBuilder modelBuilder)
         {
 #pragma warning disable 612, 618
             modelBuilder
@@ -186,9 +189,6 @@ namespace Forto.Infrastructure.Migrations
                     b.Property<decimal>("Amount")
                         .HasColumnType("decimal(18,2)");
 
-                    b.Property<int?>("CashierId")
-                        .HasColumnType("int");
-
                     b.Property<DateTime>("CreatedAt")
                         .HasColumnType("datetime2");
 
@@ -202,8 +202,6 @@ namespace Forto.Infrastructure.Migrations
                         .HasColumnType("datetime2");
 
                     b.HasKey("Id");
-
-                    b.HasIndex("CashierId");
 
                     b.ToTable("Tips", "billing");
                 });
@@ -1524,14 +1522,6 @@ namespace Forto.Infrastructure.Migrations
                         .IsRequired();
 
                     b.Navigation("Invoice");
-                });
-
-            modelBuilder.Entity("Forto.Domain.Entities.Billings.Tips", b =>
-                {
-                    b.HasOne("Forto.Domain.Entities.Employees.Employee", null)
-                        .WithMany()
-                        .HasForeignKey("CashierId")
-                        .OnDelete(DeleteBehavior.NoAction);
                 });
 
             modelBuilder.Entity("Forto.Domain.Entities.Bookings.Booking", b =>

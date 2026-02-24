@@ -23,6 +23,7 @@ using Forto.Application.Abstractions.Services.Inventory.MaterialsCheck;
 using Forto.Application.Abstractions.Services.Inventory.Products;
 using Forto.Application.Abstractions.Services.Email;
 using Forto.Application.Abstractions.Services.Invoices;
+using Forto.Application.Abstractions.Services.Billings.Tips;
 using Forto.Application.Common;
 using Forto.Application.Abstractions.Services.Ops.Products;
 using Forto.Application.Abstractions.Services.Ops.Products.StockMovement;
@@ -169,6 +170,7 @@ namespace Forto.Api
             builder.Services.AddScoped<IBookingLifecycleService, BookingLifecycleService>();
             builder.Services.AddScoped<IBookingItemOpsService, BookingItemOpsService>();
             builder.Services.AddScoped<ICashierCheckoutService, CashierCheckoutService>();
+            builder.Services.AddScoped<ITipsService, TipsService>();
 
 
 

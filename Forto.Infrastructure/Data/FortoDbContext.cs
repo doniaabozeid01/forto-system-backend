@@ -227,6 +227,12 @@ namespace Forto.Infrastructure.Data
 
 
 
+            modelBuilder.Entity<Tips>().ToTable("Tips", "billing");
+            modelBuilder.Entity<Tips>()
+                .HasOne<Employee>()
+                .WithMany()
+                .HasForeignKey(x => x.CashierId)
+                .OnDelete(DeleteBehavior.NoAction);
             modelBuilder.Entity<Invoice>().ToTable("Invoices", "billing");
             modelBuilder.Entity<InvoiceLine>().ToTable("InvoiceLines", "billing");
 
