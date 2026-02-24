@@ -13,6 +13,7 @@ namespace Forto.Application.DTOs.Dashboard
         public DateOnly To { get; set; }
 
         public decimal PaidRevenue { get; set; }
+        public decimal paidRevenueIncludingTips { get; set; }
 
         public decimal MaterialsConsumeCost { get; set; }
         public decimal MaterialsWasteCost { get; set; }

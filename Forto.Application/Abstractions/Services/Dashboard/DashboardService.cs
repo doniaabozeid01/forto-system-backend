@@ -200,6 +200,7 @@ namespace Forto.Application.Abstractions.Services.Dashboard
                 t.TipsDate >= from && t.TipsDate <= to);
             var totalTips = tipsInRange.Sum(t => t.Amount);
 
+            var paidRevenueIncludingTips = paidRevenue + totalTips;
             // الربح النهائي = ربح التشغيل + الإكراميات
             var netProfitIncludingTips = operatingProfit + totalTips;
 
@@ -210,7 +211,7 @@ namespace Forto.Application.Abstractions.Services.Dashboard
                 To = to,
 
                 PaidRevenue = paidRevenue,
-
+                paidRevenueIncludingTips = paidRevenueIncludingTips,
                 MaterialsConsumeCost = materialsConsumeCost,
                 MaterialsWasteCost = materialsWasteCost,
                 MaterialsAdjustNet = materialsAdjustNet,
