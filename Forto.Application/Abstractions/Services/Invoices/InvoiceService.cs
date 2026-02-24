@@ -2255,6 +2255,10 @@ namespace Forto.Application.Abstractions.Services.Invoices
             // ✅ Save #1: get invoice.Id
             await _uow.SaveChangesAsync();
 
+            // ✅ جعل وقت الدفع = وقت الإنشاء (PaidAt = CreatedAt)
+            invoice.PaidAt = invoice.CreatedAt;
+            invRepo.Update(invoice);
+
             // ✅ set InvoiceNumber based on invoiceId (NO extra save now)
             invoice.InvoiceNumber = BuildInvoiceNumber(invoice.Id, occurred);
             invRepo.Update(invoice);
