@@ -6,7 +6,7 @@ namespace Forto.Application.Abstractions.Services.Billings.Tips
     {
         Task<TipResponse> CreateAsync(CreateTipRequest request);
         Task<TipResponse?> GetByIdAsync(int id);
-        Task<IReadOnlyList<TipResponse>> GetAllAsync(DateOnly? fromDate = null, DateOnly? toDate = null);
+        Task<TipsListResponse> GetAllAsync(DateOnly? fromDate = null, DateOnly? toDate = null);
         Task<TipResponse?> UpdateAsync(int id, UpdateTipRequest request);
         Task<bool> DeleteAsync(int id);
     }

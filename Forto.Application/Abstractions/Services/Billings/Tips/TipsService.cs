@@ -44,14 +44,22 @@ namespace Forto.Application.Abstractions.Services.Billings.Tips
             return entity == null ? null : Map(entity);
         }
 
-        public async Task<IReadOnlyList<TipResponse>> GetAllAsync(DateOnly? fromDate = null, DateOnly? toDate = null)
+        public async Task<TipsListResponse> GetAllAsync(DateOnly? fromDate = null, DateOnly? toDate = null)
         {
             var repo = _uow.Repository<TipsEntity>();
             var list = await repo.FindAsync(x =>
                 (!fromDate.HasValue || x.TipsDate >= fromDate.Value) &&
                 (!toDate.HasValue || x.TipsDate <= toDate.Value));
 
-            return list.OrderByDescending(x => x.TipsDate).ThenByDescending(x => x.Id).Select(Map).ToList();
+            var ordered = list.OrderByDescending(x => x.TipsDate).ThenByDescending(x => x.Id).ToList();
+            var items = ordered.Select(Map).ToList();
+            var total = items.Sum(x => x.Amount);
+
+            return new TipsListResponse
+            {
+                Items = items,
+                Total = total
+            };
         }
 
         public async Task<TipResponse?> UpdateAsync(int id, UpdateTipRequest request)

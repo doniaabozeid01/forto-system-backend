@@ -3387,6 +3387,17 @@ namespace Forto.Application.Abstractions.Services.Invoices
             var totalProfit = totalRevenue - totalCost;
 
             // ===============================
+            // Tips في نفس الفترة (من-إلى)
+            // ===============================
+            decimal totalTips = 0;
+            var tipsRepo = _uow.Repository<Forto.Domain.Entities.Billings.Tips>();
+            var tipsList = await tipsRepo.FindAsync(t =>
+                (!fromDateOnly.HasValue || t.TipsDate >= fromDateOnly.Value) &&
+                (!toDateOnly.HasValue || t.TipsDate <= toDateOnly.Value));
+            totalTips = tipsList.Sum(t => t.Amount);
+            var totalAmountIncludingTips = totalRevenue + totalTips;
+
+            // ===============================
             // Pagination
             // ===============================
             var skip = (query.Page - 1) * query.PageSize;
@@ -3400,6 +3411,8 @@ namespace Forto.Application.Abstractions.Services.Invoices
                     {
                         TotalCount = totalCount,
                         TotalRevenue = totalRevenue,
+                        TotalTips = totalTips,
+                        TotalAmountIncludingTips = totalAmountIncludingTips,
                         TotalProductRevenue = totalProductRevenue,
                         TotalCashAmount = totalCashAmount,
                         TotalVisaAmount = totalVisaAmount,
@@ -3534,6 +3547,8 @@ namespace Forto.Application.Abstractions.Services.Invoices
                 {
                     TotalCount = totalCount,
                     TotalRevenue = totalRevenue,
+                    TotalTips = totalTips,
+                    TotalAmountIncludingTips = totalAmountIncludingTips,
                     TotalProductRevenue = totalProductRevenue,
                     TotalCashAmount = totalCashAmount,
                     TotalVisaAmount = totalVisaAmount,

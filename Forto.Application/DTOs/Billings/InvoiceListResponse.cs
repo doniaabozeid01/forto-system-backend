@@ -20,6 +20,10 @@ namespace Forto.Application.DTOs.Billings
     {
         public int TotalCount { get; set; }
         public decimal TotalRevenue { get; set; }
+        /// <summary>إجمالي الإكراميات في الفترة (نفس تاريخ من-إلى).</summary>
+        public decimal TotalTips { get; set; }
+        /// <summary>إجمالي المبلغ (إيراد الفواتير + الإكراميات) = TotalRevenue + TotalTips.</summary>
+        public decimal TotalAmountIncludingTips { get; set; }
         /// <summary>إجمالي مبيعات المنتجات فقط (منفصل عن إجمالي الإيراد).</summary>
         public decimal TotalProductRevenue { get; set; }
         /// <summary>إجمالي مبالغ الدفع كاش.</summary>
