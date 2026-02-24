@@ -194,6 +194,15 @@ namespace Forto.Application.Abstractions.Services.Dashboard
             var inventoryVariance = materialsAdjustNet + productsAdjustNet;
             var finalAccountingNet = operatingProfit + inventoryVariance;
 
+            // -------- Tips (نفس الفترة from–to) --------
+            var tipsRepo = _uow.Repository<Forto.Domain.Entities.Billings.Tips>();
+            var tipsInRange = await tipsRepo.FindAsync(t =>
+                t.TipsDate >= from && t.TipsDate <= to);
+            var totalTips = tipsInRange.Sum(t => t.Amount);
+
+            // الربح النهائي = ربح التشغيل + الإكراميات
+            var netProfitIncludingTips = operatingProfit + totalTips;
+
             return new DashboardSummaryResponse
             {
                 BranchId = branchId,
@@ -212,10 +221,12 @@ namespace Forto.Application.Abstractions.Services.Dashboard
 
                 TotalCosts = totalCosts,
 
+                TotalTips = totalTips,
+
                 OperatingProfit = operatingProfit,
                 InventoryVariance = inventoryVariance,
                 FinalAccountingNet = finalAccountingNet,
-                NetProfit = operatingProfit
+                NetProfit = netProfitIncludingTips
             };
         }
 

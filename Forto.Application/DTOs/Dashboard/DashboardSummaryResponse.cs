@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Text;
@@ -24,6 +24,9 @@ namespace Forto.Application.DTOs.Dashboard
 
         public decimal TotalCosts { get; set; }
 
+        /// <summary>إجمالي الإكراميات في الفترة.</summary>
+        public decimal TotalTips { get; set; }
+
         /// <summary>ربح التشغيل = الإيراد المدفوع − إجمالي التكاليف (بدون فروقات الجرد).</summary>
         public decimal OperatingProfit { get; set; }
 
@@ -33,7 +36,7 @@ namespace Forto.Application.DTOs.Dashboard
         /// <summary>الصافي المحاسبي النهائي (اختياري) = ربح التشغيل + فروقات الجرد.</summary>
         public decimal FinalAccountingNet { get; set; }
 
-        /// <summary>يساوي ربح التشغيل (للتوافق مع الاستخدام السابق؛ الاعتماد على OperatingProfit موصى به).</summary>
+        /// <summary>صافي الربح شامل الإكراميات = ربح التشغيل + الإكراميات.</summary>
         public decimal NetProfit { get; set; }
     }
 
