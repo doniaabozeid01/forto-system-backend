@@ -976,6 +976,7 @@ namespace Forto.Application.Abstractions.Services.Invoices
             await lineRepo.AddAsync(new InvoiceLine
             {
                 InvoiceId = invoice.Id,
+                ProductId = product.Id,
                 Description = $"Product: {product.Name}",
                 Qty = request.Qty <= 0 ? 1 : (int)request.Qty,
                 UnitPrice = unitPrice,
@@ -2281,6 +2282,7 @@ namespace Forto.Application.Abstractions.Services.Invoices
                 await lineRepo.AddAsync(new InvoiceLine
                 {
                     InvoiceId = invoice.Id,
+                    ProductId = p.Id,
                     Description = $"Product: {p.Name}",
                     Qty = it.Qty,
                     UnitPrice = p.SalePrice,
@@ -3561,7 +3563,7 @@ namespace Forto.Application.Abstractions.Services.Invoices
             };
         }
 
-        public async Task<SoldProductsReportResponse> GetSoldProductsReportAsync(DateTime fromDate, DateTime toDate)
+        public async Task<SoldProductsReportResponse> GetSoldProductsReportAsync(DateTime fromDate, DateTime toDate, int? categoryProductId = null)
         {
             var fromStart = fromDate.Date;
             var toEnd = toDate.Date.AddDays(1);
@@ -3585,6 +3587,16 @@ namespace Forto.Application.Abstractions.Services.Invoices
             var lines = await lineRepo.FindAsync(l =>
                 invoiceIds.Contains(l.InvoiceId) && l.LineType == InvoiceLineType.Product);
 
+            if (categoryProductId.HasValue)
+            {
+                var productRepo = _uow.Repository<Forto.Domain.Entities.Inventory.Product>();
+                var productIdsInCategory = (await productRepo.FindAsync(p =>
+                    p.CategoryId == categoryProductId.Value && !p.IsDeleted))
+                    .Select(p => p.Id)
+                    .ToHashSet();
+                lines = lines.Where(l => l.ProductId.HasValue && productIdsInCategory.Contains(l.ProductId.Value)).ToList();
+            }
+
             var items = new List<SoldProductItemDto>();
             decimal grandTotal = 0;
             foreach (var line in lines.OrderBy(l => l.InvoiceId).ThenBy(l => l.Id))
@@ -3595,7 +3607,7 @@ namespace Forto.Application.Abstractions.Services.Invoices
                 {
                     ProductDescription = line.Description ?? "",
                     UnitPrice = line.UnitPrice,
-                    Qty = line.Qty,
+                    Qty = line.Qty <= 0 ? 1 : line.Qty,
                     LineTotal = line.Total,
                     InvoiceNumber = invNumber,
                     InvoiceId = line.InvoiceId,
@@ -4037,6 +4049,7 @@ namespace Forto.Application.Abstractions.Services.Invoices
                 await lineRepo.AddAsync(new InvoiceLine
                 {
                     InvoiceId = invoice.Id,
+                    ProductId = p.Id,
                     LineType = InvoiceLineType.Product,
                     BookingItemId = null,
                     Description = $"Product: {p.Name}",

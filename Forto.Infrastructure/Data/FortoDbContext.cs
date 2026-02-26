@@ -670,6 +670,11 @@ modelBuilder.Entity<InvoiceLine>()
 // Optional index for faster queries
 modelBuilder.Entity<InvoiceLine>()
     .HasIndex(x => new { x.InvoiceId, x.LineType });
+            modelBuilder.Entity<InvoiceLine>()
+                .HasOne<Product>()
+                .WithMany()
+                .HasForeignKey(x => x.ProductId)
+                .OnDelete(DeleteBehavior.NoAction);
 
 
 

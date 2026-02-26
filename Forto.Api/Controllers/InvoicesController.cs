@@ -138,11 +138,11 @@ namespace Forto.Api.Controllers
 
         /// <summary>تقرير المنتجات المبيعة والمتحاسب عليها: ادّي from و to (تاريخ) يرجع المنتجات المتباعة، كل منتج بكام، وفي فاتورة رقم كام، والمجموع الكلي.</summary>
         [HttpGet("reports/sold-products")]
-        public async Task<IActionResult> GetSoldProductsReport([FromQuery] DateTime from, [FromQuery] DateTime to)
+        public async Task<IActionResult> GetSoldProductsReport([FromQuery] DateTime from, [FromQuery] DateTime to, [FromQuery] int? categoryProductId = null)
         {
             if (from > to)
                 return FailResponse("From date must be before or equal to To date", 400);
-            var data = await _service.GetSoldProductsReportAsync(from, to);
+            var data = await _service.GetSoldProductsReportAsync(from, to, categoryProductId);
             return OkResponse(data, "OK");
         }
 

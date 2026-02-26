@@ -890,6 +890,7 @@ namespace Forto.Application.Abstractions.Services.Bookings.Cashier.checkout
                 await lineRepo.AddAsync(new InvoiceLine
                 {
                     InvoiceId = invoice.Id,
+                    ProductId = p.Id,
                     Description = $"منتج: {p.Name}",
                     Qty = it.Qty <= 0 ? 1 : (int)it.Qty,
                     UnitPrice = p.SalePrice,

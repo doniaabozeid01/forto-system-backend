@@ -1,4 +1,4 @@
-﻿using Forto.Domain.Enum;
+using Forto.Domain.Enum;
 using System;
 using System.Collections.Generic;
 using System.Linq;
@@ -18,6 +18,8 @@ namespace Forto.Domain.Entities.Billings
         public decimal Total { get; set; }
 
         public int? BookingItemId { get; set; }
+        /// <summary>معرف المنتج للبنود من نوع Product.</summary>
+        public int? ProductId { get; set; }
 
         public InvoiceLineType LineType { get; set; } = InvoiceLineType.Service; // enum
 
