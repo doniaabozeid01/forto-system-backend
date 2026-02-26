@@ -891,7 +891,7 @@ namespace Forto.Application.Abstractions.Services.Bookings.Cashier.checkout
                 {
                     InvoiceId = invoice.Id,
                     Description = $"منتج: {p.Name}",
-                    Qty = 1, // لو عايزة qty تظهر صح هنغير InvoiceLine.Qty لـ decimal بعدين
+                    Qty = it.Qty <= 0 ? 1 : (int)it.Qty,
                     UnitPrice = p.SalePrice,
                     LineType = InvoiceLineType.Product,
                     Total = lineTotal
@@ -1024,7 +1024,7 @@ namespace Forto.Application.Abstractions.Services.Bookings.Cashier.checkout
                 {
                     Id = l.Id,
                     Description = l.Description,
-                    Qty = l.Qty,
+                    Qty = l.Qty <= 0 ? 1 : l.Qty,
                     UnitPrice = l.UnitPrice,
                     Total = l.Total
                 }).ToList() ?? new List<InvoiceLineResponse>()

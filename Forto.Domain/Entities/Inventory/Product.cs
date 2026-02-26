@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Text;
@@ -14,6 +14,7 @@ namespace Forto.Domain.Entities.Inventory
         public decimal SalePrice { get; set; } // سعر البيع للعميل
         public decimal CostPerUnit { get; set; } // تكلفة عليك
 
+        public int? CategoryId { get; set; }
         public bool IsActive { get; set; } = true;
     }
 }

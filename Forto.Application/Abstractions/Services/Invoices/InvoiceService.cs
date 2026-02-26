@@ -977,7 +977,7 @@ namespace Forto.Application.Abstractions.Services.Invoices
             {
                 InvoiceId = invoice.Id,
                 Description = $"Product: {product.Name}",
-                Qty = (int)request.Qty == request.Qty ? (int)request.Qty : 1, // لو qty decimal، نخليها 1 ونحط السعر في total
+                Qty = request.Qty <= 0 ? 1 : (int)request.Qty,
                 UnitPrice = unitPrice,
                 Total = lineTotal
             });
@@ -1043,7 +1043,7 @@ namespace Forto.Application.Abstractions.Services.Invoices
             {
                 Id = l.Id,
                 Description = l.Description,
-                Qty = l.Qty,
+                Qty = l.Qty <= 0 ? 1 : l.Qty,
                 UnitPrice = l.UnitPrice,
                 Total = l.Total
             }).ToList()
@@ -4040,7 +4040,7 @@ namespace Forto.Application.Abstractions.Services.Invoices
                     LineType = InvoiceLineType.Product,
                     BookingItemId = null,
                     Description = $"Product: {p.Name}",
-                    Qty = 1,                 // لو عايزة qty صح -> نغير InvoiceLine.Qty لـ decimal later
+                    Qty = it.Qty <= 0 ? 1 : (int)it.Qty,
                     UnitPrice = p.SalePrice,
                     Total = lineTotal
                 });

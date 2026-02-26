@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Text;
@@ -11,12 +11,12 @@ namespace Forto.Application.Abstractions.Services.Inventory.Products
     public interface IProductService
     {
         Task<ProductResponse> CreateAsync(CreateProductRequest request);
-        Task<IReadOnlyList<ProductResponse>> GetAllAsync();
+        Task<IReadOnlyList<ProductResponse>> GetAllAsync(int? categoryId = null);
         Task<ProductResponse?> GetByIdAsync(int id);
         Task<ProductResponse?> UpdateAsync(int id, UpdateProductRequest request);
         Task<bool> DeleteAsync(int id);
 
-        Task<IReadOnlyList<ProductWithStockResponse>> GetAllWithStockAsync(int branchId);
+        Task<IReadOnlyList<ProductWithStockResponse>> GetAllWithStockAsync(int branchId, int? categoryId = null);
 
     }
 }

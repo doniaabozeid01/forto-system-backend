@@ -23,7 +23,7 @@ namespace Forto.Api.Seed
                 var branchRepo = uow.Repository<Branch>();
                 if (!await branchRepo.AnyAsync(_ => true))
                 {
-                    await branchRepo.AddAsync(new Branch { Name = "الفرع الرئيسي", CapacityPerHour = 4, IsActive = true });
+                    await branchRepo.AddAsync(new Branch { Name = "الفرع الرئيسي", CapacityPerHour = 2, IsActive = true });
                     await uow.SaveChangesAsync();
                     log.LogInformation("Seed: Branch added.");
                 }

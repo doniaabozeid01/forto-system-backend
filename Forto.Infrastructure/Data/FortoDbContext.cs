@@ -448,8 +448,17 @@ namespace Forto.Infrastructure.Data
 
 
 
-            modelBuilder.Entity<Product>().ToTable("Products", "inventory");
+            modelBuilder.Entity<ProductCategory>().ToTable("ProductCategories", "inventory");
+            modelBuilder.Entity<ProductCategory>()
+                .HasIndex(x => new { x.ParentId, x.Name })
+                .IsUnique(false);
 
+            modelBuilder.Entity<Product>().ToTable("Products", "inventory");
+            modelBuilder.Entity<Product>()
+                .HasOne<ProductCategory>()
+                .WithMany()
+                .HasForeignKey(x => x.CategoryId)
+                .OnDelete(DeleteBehavior.NoAction);
             modelBuilder.Entity<Product>()
                 .Property(x => x.SalePrice)
                 .HasPrecision(18, 3);

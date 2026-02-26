@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.Collections.Generic;
 using System.ComponentModel.DataAnnotations;
 using System.Linq;
@@ -19,6 +19,9 @@ namespace Forto.Application.DTOs.Inventory.Products
 
         [Range(0, 100000000)]
         public decimal CostPerUnit { get; set; }
+
+        /// <summary>معرف فئة المنتج (اختياري).</summary>
+        public int? CategoryId { get; set; }
     }
 
 }

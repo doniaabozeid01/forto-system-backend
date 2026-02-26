@@ -1,4 +1,4 @@
-﻿using Forto.Application.Abstractions.Services.Inventory.Products;
+using Forto.Application.Abstractions.Services.Inventory.Products;
 using Forto.Application.DTOs.Inventory.Products;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
@@ -18,8 +18,8 @@ namespace Forto.Api.Controllers
             => CreatedResponse(await _service.CreateAsync(request), "Product created");
 
         [HttpGet("GetAll")]
-        public async Task<IActionResult> GetAll()
-            => OkResponse(await _service.GetAllAsync(), "OK");
+        public async Task<IActionResult> GetAll([FromQuery] int? categoryId = null)
+            => OkResponse(await _service.GetAllAsync(categoryId), "OK");
 
         [HttpGet("GetById/{id:int}")]
         public async Task<IActionResult> GetById(int id)
@@ -48,9 +48,9 @@ namespace Forto.Api.Controllers
 
 
         [HttpGet("with-stock")]
-        public async Task<IActionResult> GetAllWithStock([FromQuery] int branchId)
+        public async Task<IActionResult> GetAllWithStock([FromQuery] int branchId, [FromQuery] int? categoryId = null)
         {
-            var data = await _service.GetAllWithStockAsync(branchId);
+            var data = await _service.GetAllWithStockAsync(branchId, categoryId);
             return OkResponse(data, "OK");
         }
 

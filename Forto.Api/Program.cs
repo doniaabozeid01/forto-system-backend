@@ -21,6 +21,7 @@ using Forto.Application.Abstractions.Services.EmployeeServices;
 using Forto.Application.Abstractions.Services.Inventory.Materials;
 using Forto.Application.Abstractions.Services.Inventory.MaterialsCheck;
 using Forto.Application.Abstractions.Services.Inventory.Products;
+using Forto.Application.Abstractions.Services.Inventory.ProductCategories;
 using Forto.Application.Abstractions.Services.Email;
 using Forto.Application.Abstractions.Services.Invoices;
 using Forto.Application.Abstractions.Services.Billings.Tips;
@@ -164,6 +165,7 @@ namespace Forto.Api
             builder.Services.AddScoped<IBookingClosingService, BookingClosingService>();
             builder.Services.AddScoped<IStockMovementService, StockMovementService>();
             builder.Services.AddScoped<IProductService, ProductService>();
+            builder.Services.AddScoped<IProductCategoryService, ProductCategoryService>();
             builder.Services.AddScoped<IBranchProductStockService, BranchProductStockService>();
             builder.Services.AddScoped<IProductStockMovementService, ProductStockMovementService>();
             builder.Services.AddScoped<IDashboardService, DashboardService>();

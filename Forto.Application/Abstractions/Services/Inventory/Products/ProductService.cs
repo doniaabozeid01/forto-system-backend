@@ -8,6 +8,7 @@ using Forto.Application.Abstractions.Repositories;
 using Forto.Application.DTOs.Inventory.Products;
 using Forto.Domain.Entities.Inventory;
 using Forto.Domain.Entities.Ops;
+using ProductCategoryEntity = Forto.Domain.Entities.Inventory.ProductCategory;
 
 namespace Forto.Application.Abstractions.Services.Inventory.Products
 {
@@ -21,6 +22,13 @@ namespace Forto.Application.Abstractions.Services.Inventory.Products
         {
             var repo = _uow.Repository<Product>();
 
+            if (request.CategoryId.HasValue)
+            {
+                var cat = await _uow.Repository<ProductCategoryEntity>().GetByIdAsync(request.CategoryId.Value);
+                if (cat == null || !cat.IsActive)
+                    throw new BusinessException("Product category not found or inactive", 400);
+            }
+
             var name = request.Name.Trim();
             var exists = await repo.AnyAsync(p => p.Name == name);
             if (exists)
@@ -32,23 +40,29 @@ namespace Forto.Application.Abstractions.Services.Inventory.Products
                 Sku = request.Sku?.Trim(),
                 SalePrice = request.SalePrice,
                 CostPerUnit = request.CostPerUnit,
+                CategoryId = request.CategoryId,
                 IsActive = true
             };
 
             await repo.AddAsync(p);
             await _uow.SaveChangesAsync();
 
-            return Map(p);
+            var categoryName = await GetCategoryNameAsync(p.CategoryId);
+            return Map(p, categoryName);
         }
 
-        public async Task<IReadOnlyList<ProductResponse>> GetAllAsync()
+        public async Task<IReadOnlyList<ProductResponse>> GetAllAsync(int? categoryId = null)
         {
-            var list = await _uow.Repository<Product>().FindAsync(p => !p.IsDeleted);
-            return list.Select(Map).ToList();
+            var repo = _uow.Repository<Product>();
+            var list = categoryId.HasValue
+                ? await repo.FindAsync(p => !p.IsDeleted && p.CategoryId == categoryId.Value)
+                : await repo.FindAsync(p => !p.IsDeleted);
+            var categoryNameMap = await GetCategoryNameMapAsync(list.Where(x => x.CategoryId.HasValue).Select(x => x.CategoryId!.Value).Distinct().ToList());
+            return list.Select(p => Map(p, p.CategoryId.HasValue && categoryNameMap.TryGetValue(p.CategoryId.Value, out var n) ? n : null)).ToList();
         }
-        public async Task<IReadOnlyList<ProductWithStockResponse>> GetAllWithStockAsync(int branchId)
+
+        public async Task<IReadOnlyList<ProductWithStockResponse>> GetAllWithStockAsync(int branchId, int? categoryId = null)
         {
-            // validate branch
             var branch = await _uow.Repository<Branch>().GetByIdAsync(branchId);
             if (branch == null || !branch.IsActive)
                 throw new BusinessException("Branch not found", 404);
@@ -56,27 +70,25 @@ namespace Forto.Application.Abstractions.Services.Inventory.Products
             var productRepo = _uow.Repository<Product>();
             var stockRepo = _uow.Repository<BranchProductStock>();
 
-            // 1) products (ما عدا المحذوفة)
-            var products = await productRepo.FindAsync(p => !p.IsDeleted);
+            var products = categoryId.HasValue
+                ? await productRepo.FindAsync(p => !p.IsDeleted && p.CategoryId == categoryId.Value)
+                : await productRepo.FindAsync(p => !p.IsDeleted);
             if (products.Count == 0)
                 return new List<ProductWithStockResponse>();
 
             var productIds = products.Select(p => p.Id).ToList();
-
-            // 2) stock for that branch
             var stocks = await stockRepo.FindAsync(s => s.BranchId == branchId && productIds.Contains(s.ProductId));
             var stockMap = stocks.ToDictionary(s => s.ProductId, s => s);
+            var categoryNameMap = await GetCategoryNameMapAsync(products.Where(p => p.CategoryId.HasValue).Select(p => p.CategoryId!.Value).Distinct().ToList());
 
-            // 3) merge
             return products.Select(p =>
             {
                 stockMap.TryGetValue(p.Id, out var st);
-
                 var onHand = st?.OnHandQty ?? 0m;
                 var reserved = st?.ReservedQty ?? 0m;
                 var available = onHand - reserved;
                 if (available < 0) available = 0;
-
+                var categoryName = p.CategoryId.HasValue && categoryNameMap.TryGetValue(p.CategoryId.Value, out var cn) ? cn : null;
                 return new ProductWithStockResponse
                 {
                     Id = p.Id,
@@ -85,7 +97,8 @@ namespace Forto.Application.Abstractions.Services.Inventory.Products
                     SalePrice = p.SalePrice,
                     CostPerUnit = p.CostPerUnit,
                     IsActive = p.IsActive,
-
+                    CategoryId = p.CategoryId,
+                    CategoryName = categoryName,
                     OnHandQty = onHand,
                     ReservedQty = reserved,
                     AvailableQty = available,
@@ -97,7 +110,9 @@ namespace Forto.Application.Abstractions.Services.Inventory.Products
         public async Task<ProductResponse?> GetByIdAsync(int id)
         {
             var p = await _uow.Repository<Product>().GetByIdAsync(id);
-            return p == null ? null : Map(p);
+            if (p == null) return null;
+            var categoryName = await GetCategoryNameAsync(p.CategoryId);
+            return Map(p, categoryName);
         }
 
         public async Task<ProductResponse?> UpdateAsync(int id, UpdateProductRequest request)
@@ -112,16 +127,25 @@ namespace Forto.Application.Abstractions.Services.Inventory.Products
             if (exists)
                 throw new BusinessException("Product name already exists", 409);
 
+            if (request.CategoryId.HasValue)
+            {
+                var cat = await _uow.Repository<ProductCategoryEntity>().GetByIdAsync(request.CategoryId.Value);
+                if (cat == null || !cat.IsActive)
+                    throw new BusinessException("Product category not found or inactive", 400);
+            }
+
             p.Name = name;
             p.Sku = request.Sku?.Trim();
             p.SalePrice = request.SalePrice;
             p.CostPerUnit = request.CostPerUnit;
+            p.CategoryId = request.CategoryId;
             p.IsActive = request.IsActive;
 
             repo.Update(p);
             await _uow.SaveChangesAsync();
 
-            return Map(p);
+            var categoryName = await GetCategoryNameAsync(p.CategoryId);
+            return Map(p, categoryName);
         }
 
         public async Task<bool> DeleteAsync(int id)
@@ -135,14 +159,30 @@ namespace Forto.Application.Abstractions.Services.Inventory.Products
             return true;
         }
 
-        private static ProductResponse Map(Product p) => new()
+        private async Task<string?> GetCategoryNameAsync(int? categoryId)
+        {
+            if (!categoryId.HasValue) return null;
+            var c = await _uow.Repository<ProductCategoryEntity>().GetByIdAsync(categoryId.Value);
+            return c?.Name;
+        }
+
+        private async Task<Dictionary<int, string>> GetCategoryNameMapAsync(List<int> categoryIds)
+        {
+            if (categoryIds == null || categoryIds.Count == 0) return new Dictionary<int, string>();
+            var list = await _uow.Repository<ProductCategoryEntity>().FindAsync(c => categoryIds.Contains(c.Id));
+            return list.ToDictionary(c => c.Id, c => c.Name);
+        }
+
+        private static ProductResponse Map(Product p, string? categoryName = null) => new()
         {
             Id = p.Id,
             Name = p.Name,
             Sku = p.Sku,
             SalePrice = p.SalePrice,
             CostPerUnit = p.CostPerUnit,
-            IsActive = p.IsActive
+            IsActive = p.IsActive,
+            CategoryId = p.CategoryId,
+            CategoryName = categoryName
         };
     }
 
