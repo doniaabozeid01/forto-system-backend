@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Text;
@@ -16,6 +16,8 @@ namespace Forto.Domain.Entities.Ops
         public Material Material { get; set; } = null!;
 
         public decimal OnHandQty { get; set; } = 0;     // الموجود فعليًا
+        /// <summary>إجمالي تكلفة الرصيد الحالي (للمتوسط المرجح المتداول).</summary>
+        public decimal TotalCostOfStock { get; set; } = 0;
         public decimal ReservedQty { get; set; } = 0;   // المحجوز (للشغل اللي بدأ)
         public decimal ReorderLevel { get; set; } = 0;  // اختياري عشان يرجعلي انذار مثلا بعدين ان لازم اشتري باه 
 

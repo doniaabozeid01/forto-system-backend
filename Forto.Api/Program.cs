@@ -2,7 +2,7 @@
 using System.Text;
 using Forto.Api.Common;
 using Forto.Api.Middleware;
-using Forto.Api.Seed;
+//using Forto.Api.Seed;
 using Forto.Application.Abstractions.Repositories;
 using Forto.Application.Abstractions.Services.Bookings;
 using Forto.Application.Abstractions.Services.Bookings.Admin;
@@ -236,8 +236,8 @@ namespace Forto.Api
             app.UseMiddleware<ExceptionHandlingMiddleware>();
             app.UseCors("AllowFortoOrigins");
 
-            await IdentitySeeder.SeedRolesAsync(app.Services);
-            await DataSeeder.SeedAsync(app.Services);
+            //await IdentitySeeder.SeedRolesAsync(app.Services);
+            //await DataSeeder.SeedAsync(app.Services);
 
             app.MapHub<InvoiceDeletionHub>("/hubs/invoice-deletion");
             app.MapControllers();

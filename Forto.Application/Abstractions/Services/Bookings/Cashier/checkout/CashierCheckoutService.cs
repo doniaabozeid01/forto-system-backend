@@ -880,7 +880,9 @@ namespace Forto.Application.Abstractions.Services.Bookings.Cashier.checkout
                 if (available < it.Qty)
                     throw new BusinessException($"Not enough stock for product {it.ProductId}", 409);
 
-                // stock
+                decimal unitCostSell = st.OnHandQty > 0 ? st.TotalCostOfStock / st.OnHandQty : p.CostPerUnit;
+                st.TotalCostOfStock -= it.Qty * unitCostSell;
+                if (st.TotalCostOfStock < 0) st.TotalCostOfStock = 0;
                 st.OnHandQty -= it.Qty;
                 stockRepo.Update(st);
 
@@ -905,8 +907,8 @@ namespace Forto.Application.Abstractions.Services.Bookings.Cashier.checkout
                     ProductId = p.Id,
                     MovementType = ProductMovementType.Sell,
                     Qty = it.Qty,
-                    UnitCostSnapshot = p.CostPerUnit,
-                    TotalCost = it.Qty * p.CostPerUnit,
+                    UnitCostSnapshot = unitCostSell,
+                    TotalCost = it.Qty * unitCostSell,
                     OccurredAt = DateTime.UtcNow,
                     InvoiceId = invoice.Id,
                     BookingId = invoice.BookingId,
@@ -1060,7 +1062,9 @@ namespace Forto.Application.Abstractions.Services.Bookings.Cashier.checkout
             if (available < 1)
                 throw new BusinessException("Not enough stock for gift product", 409);
 
-            // ✅ deduct stock
+            decimal unitCostGift = stock.OnHandQty > 0 ? stock.TotalCostOfStock / stock.OnHandQty : product.CostPerUnit;
+            stock.TotalCostOfStock -= 1 * unitCostGift;
+            if (stock.TotalCostOfStock < 0) stock.TotalCostOfStock = 0;
             stock.OnHandQty -= 1;
             stockRepo.Update(stock);
 
@@ -1082,8 +1086,8 @@ namespace Forto.Application.Abstractions.Services.Bookings.Cashier.checkout
                 ProductId = productId,
                 MovementType = ProductMovementType.Gift,
                 Qty = 1,
-                UnitCostSnapshot = product.CostPerUnit,
-                TotalCost = product.CostPerUnit,
+                UnitCostSnapshot = unitCostGift,
+                TotalCost = unitCostGift,
                 OccurredAt = DateTime.UtcNow,
                 InvoiceId = invoice.Id,
                 RecordedByEmployeeId = cashierId,

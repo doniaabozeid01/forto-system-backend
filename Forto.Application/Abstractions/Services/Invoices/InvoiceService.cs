@@ -965,7 +965,12 @@ namespace Forto.Application.Abstractions.Services.Invoices
                         ["stock"] = new[] { $"Available={available}, Requested={request.Qty}" }
                     });
 
-            // 6) decrease stock
+            // 6) متوسط التكلفة المرجح للفرع ثم خصم الرصيد والتكلفة
+            decimal unitCostForSell = stock.OnHandQty > 0
+                ? stock.TotalCostOfStock / stock.OnHandQty
+                : product.CostPerUnit;
+            stock.TotalCostOfStock -= request.Qty * unitCostForSell;
+            if (stock.TotalCostOfStock < 0) stock.TotalCostOfStock = 0;
             stock.OnHandQty -= request.Qty;
             stockRepo.Update(stock);
 
@@ -998,8 +1003,8 @@ namespace Forto.Application.Abstractions.Services.Invoices
                 ProductId = product.Id,
                 MovementType = ProductMovementType.Sell,
                 Qty = request.Qty,
-                UnitCostSnapshot = product.CostPerUnit,
-                TotalCost = request.Qty * product.CostPerUnit,
+                UnitCostSnapshot = unitCostForSell,
+                TotalCost = request.Qty * unitCostForSell,
                 OccurredAt = occurred,
                 InvoiceId = invoice.Id,
                 BookingId = booking.Id,
@@ -1226,7 +1231,9 @@ namespace Forto.Application.Abstractions.Services.Invoices
             if (available < 1)
                 throw new BusinessException("Gift out of stock", 409);
 
-            // Decrease stock by 1
+            decimal unitCostGift = stock.OnHandQty > 0 ? stock.TotalCostOfStock / stock.OnHandQty : product.CostPerUnit;
+            stock.TotalCostOfStock -= 1 * unitCostGift;
+            if (stock.TotalCostOfStock < 0) stock.TotalCostOfStock = 0;
             stock.OnHandQty -= 1;
             stockRepo.Update(stock);
 
@@ -1253,8 +1260,8 @@ namespace Forto.Application.Abstractions.Services.Invoices
                 ProductId = product.Id,
                 MovementType = ProductMovementType.Gift,
                 Qty = 1,
-                UnitCostSnapshot = product.CostPerUnit,
-                TotalCost = 1 * product.CostPerUnit,
+                UnitCostSnapshot = unitCostGift,
+                TotalCost = 1 * unitCostGift,
                 OccurredAt = occurredAt,
                 InvoiceId = invoice.Id,
                 BookingId = booking.Id,
@@ -2271,7 +2278,9 @@ namespace Forto.Application.Abstractions.Services.Invoices
                 var p = pMap[it.ProductId];
                 var st = sMap[it.ProductId];
 
-                // decrease stock
+                decimal unitCostSell = st.OnHandQty > 0 ? st.TotalCostOfStock / st.OnHandQty : p.CostPerUnit;
+                st.TotalCostOfStock -= it.Qty * unitCostSell;
+                if (st.TotalCostOfStock < 0) st.TotalCostOfStock = 0;
                 st.OnHandQty -= it.Qty;
                 stockRepo.Update(st);
 
@@ -2296,8 +2305,8 @@ namespace Forto.Application.Abstractions.Services.Invoices
                     ProductId = p.Id,
                     MovementType = ProductMovementType.Sell,
                     Qty = it.Qty,
-                    UnitCostSnapshot = p.CostPerUnit,
-                    TotalCost = it.Qty * p.CostPerUnit,
+                    UnitCostSnapshot = unitCostSell,
+                    TotalCost = it.Qty * unitCostSell,
                     OccurredAt = occurred,
                     InvoiceId = invoice.Id,
                     BookingId = null,
@@ -4039,7 +4048,9 @@ namespace Forto.Application.Abstractions.Services.Invoices
                 var p = pMap[it.ProductId];
                 var st = sMap[it.ProductId];
 
-                // decrease stock
+                decimal unitCostSell = st.OnHandQty > 0 ? st.TotalCostOfStock / st.OnHandQty : p.CostPerUnit;
+                st.TotalCostOfStock -= it.Qty * unitCostSell;
+                if (st.TotalCostOfStock < 0) st.TotalCostOfStock = 0;
                 st.OnHandQty -= it.Qty;
                 stockRepo.Update(st);
 
@@ -4065,8 +4076,8 @@ namespace Forto.Application.Abstractions.Services.Invoices
                     ProductId = p.Id,
                     MovementType = ProductMovementType.Sell,
                     Qty = it.Qty,
-                    UnitCostSnapshot = p.CostPerUnit,
-                    TotalCost = it.Qty * p.CostPerUnit,
+                    UnitCostSnapshot = unitCostSell,
+                    TotalCost = it.Qty * unitCostSell,
                     OccurredAt = now,
                     InvoiceId = invoice.Id,
                     BookingId = invoice.BookingId,

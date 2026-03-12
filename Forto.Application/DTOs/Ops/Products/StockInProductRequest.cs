@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.Collections.Generic;
 using System.ComponentModel.DataAnnotations;
 using System.Linq;
@@ -19,6 +19,10 @@ namespace Forto.Application.DTOs.Ops.Products
         public decimal Qty { get; set; }
 
         public decimal? UnitCost { get; set; } // ✅ اختياري: لو مش مبعوت ناخد من Product.CostPerUnit
+
+        /// <summary>سعر البيع — لو مُدخل يتحدّث على المنتج، لو مش مبعوت يبقى كما هو.</summary>
+        [Range(0, 100000000)]
+        public decimal? SalePrice { get; set; }
 
         public string? Notes { get; set; }
         public DateTime? OccurredAt { get; set; }

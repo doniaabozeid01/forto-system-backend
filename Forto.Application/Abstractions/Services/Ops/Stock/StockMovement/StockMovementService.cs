@@ -120,28 +120,30 @@ namespace Forto.Application.Abstractions.Services.Ops.Stock.StockMovement
             var stock = (await stockRepo.FindTrackingAsync(s => s.BranchId == branchId && s.MaterialId == request.MaterialId))
                 .FirstOrDefault();
 
+            var isNewStock = stock == null;
             if (stock == null)
             {
                 stock = new BranchMaterialStock
                 {
                     BranchId = branchId,
                     MaterialId = request.MaterialId,
-                    OnHandQty = request.Qty,
+                    OnHandQty = 0,
+                    TotalCostOfStock = 0,
                     ReservedQty = 0,
                     ReorderLevel = 0
                 };
                 await stockRepo.AddAsync(stock);
-                // لا تستدعي Update على كيان جديد — الـ Id لسه مؤقت، EF بيولّده عند SaveChanges
             }
-            else
-            {
-                stock.OnHandQty += request.Qty;
+
+            // المتوسط المرجح المتداول: (1) الرصيد الجديد (2) إجمالي التكلفة الجديد
+            var newBatchCost = request.Qty * unitCost;
+            stock.TotalCostOfStock += newBatchCost;
+            stock.OnHandQty += request.Qty;
+            if (!isNewStock)
                 stockRepo.Update(stock);
-            }
 
             var occurred = request.OccurredAt ?? DateTime.UtcNow;
 
-            // record movement IN
             await movementRepo.AddAsync(new MaterialMovement
             {
                 BranchId = branchId,
@@ -151,15 +153,20 @@ namespace Forto.Application.Abstractions.Services.Ops.Stock.StockMovement
                 UnitCostSnapshot = unitCost,
                 TotalCost = request.Qty * unitCost,
                 OccurredAt = occurred,
-                //RecordedByEmployeeId = request.CashierId,
                 Notes = request.Notes
             });
 
-            // ✅ if unitCost was explicitly sent, update material current cost
-            if (request.UnitCost.HasValue)
+            // التكلفة على المادة = المتوسط المرجح الجديد
+            if (stock.OnHandQty > 0)
             {
-                // هنا مهم: حدثّي التكلفة الحالية علشان الشغل اللي بعد كده ياخد snapshot جديد
-                material.CostPerUnit = request.UnitCost.Value;
+                material.CostPerUnit = stock.TotalCostOfStock / stock.OnHandQty;
+                materialRepo.Update(material);
+            }
+
+            // سعر التحمل/البيع: لو مُدخل في الطلب نحدّث، لو مش مبعوت نتركه كما هو
+            if (request.ChargePerUnit.HasValue)
+            {
+                material.ChargePerUnit = request.ChargePerUnit.Value;
                 materialRepo.Update(material);
             }
 
@@ -194,44 +201,39 @@ namespace Forto.Application.Abstractions.Services.Ops.Stock.StockMovement
                     BranchId = branchId,
                     MaterialId = request.MaterialId,
                     OnHandQty = 0,
+                    TotalCostOfStock = 0,
                     ReservedQty = 0,
                     ReorderLevel = 0
                 };
                 await stockRepo.AddAsync(stock);
             }
 
-            // مهم: ماينفعش physical أقل من reserved (لأن reserved شغل شغال)
             if (request.PhysicalOnHandQty < stock.ReservedQty)
                 throw new BusinessException("PhysicalOnHandQty cannot be less than ReservedQty", 409);
 
             var occurred = request.OccurredAt ?? DateTime.UtcNow;
-
-            // =========================
-            // Monthly average cost from IN movements (same month)
-            // =========================
-            var monthStart = new DateTime(occurred.Year, occurred.Month, 1, 0, 0, 0, DateTimeKind.Utc);
-            var nextMonthStart = monthStart.AddMonths(1);
-
-            var inMoves = await movementRepo.FindAsync(m =>
-                m.BranchId == branchId &&
-                m.MaterialId == request.MaterialId &&
-                m.MovementType == MaterialMovementType.In &&
-                m.OccurredAt >= monthStart &&
-                m.OccurredAt < nextMonthStart);
-
-            var totalInQty = inMoves.Sum(m => m.Qty);
-            var totalInCost = inMoves.Sum(m => m.TotalCost);
+            var diff = request.PhysicalOnHandQty - stock.OnHandQty;
 
             decimal unitCostForAdjust;
-            if (totalInQty > 0)
-                unitCostForAdjust = totalInCost / totalInQty;     // ✅ monthly avg
+            if (diff < 0 && stock.OnHandQty > 0)
+                unitCostForAdjust = stock.TotalCostOfStock / stock.OnHandQty;
             else
-                unitCostForAdjust = material.CostPerUnit;          // fallback
+            {
+                var monthStart = new DateTime(occurred.Year, occurred.Month, 1, 0, 0, 0, DateTimeKind.Utc);
+                var nextMonthStart = monthStart.AddMonths(1);
+                var inMoves = await movementRepo.FindAsync(m =>
+                    m.BranchId == branchId &&
+                    m.MaterialId == request.MaterialId &&
+                    m.MovementType == MaterialMovementType.In &&
+                    m.OccurredAt >= monthStart &&
+                    m.OccurredAt < nextMonthStart);
+                var totalInQty = inMoves.Sum(m => m.Qty);
+                var totalInCost = inMoves.Sum(m => m.TotalCost);
+                unitCostForAdjust = totalInQty > 0 ? totalInCost / totalInQty : material.CostPerUnit;
+            }
 
-            // =========================
-            // Apply adjust on stock
-            // =========================
-            var diff = request.PhysicalOnHandQty - stock.OnHandQty; // ممكن + أو -
+            stock.TotalCostOfStock += diff * unitCostForAdjust;
+            if (stock.TotalCostOfStock < 0) stock.TotalCostOfStock = 0;
             stock.OnHandQty = request.PhysicalOnHandQty;
             stockRepo.Update(stock);
 

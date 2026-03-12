@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.Collections.Generic;
 using System.ComponentModel.DataAnnotations;
 using System.Linq;
@@ -20,6 +20,10 @@ namespace Forto.Application.DTOs.Ops.Stock
 
         [Range(0, 100000000)]
         public decimal? UnitCost { get; set; } // تكلفة الشراء
+
+        /// <summary>سعر التحمل/البيع للوحدة — لو مُدخل يتحدّث على المادة، لو مش مبعوت يبقى كما هو.</summary>
+        [Range(0, 100000000)]
+        public decimal? ChargePerUnit { get; set; }
 
         public string? Notes { get; set; }
         public DateTime? OccurredAt { get; set; } // لو null هنستخدم now

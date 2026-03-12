@@ -4,6 +4,7 @@ using Forto.Infrastructure.Data;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Infrastructure;
 using Microsoft.EntityFrameworkCore.Metadata;
+using Microsoft.EntityFrameworkCore.Migrations;
 using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 
 #nullable disable
@@ -11,9 +12,11 @@ using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 namespace Forto.Infrastructure.Migrations
 {
     [DbContext(typeof(FortoDbContext))]
-    partial class FortoDbContextModelSnapshot : ModelSnapshot
+    [Migration("20260309131946_AddTotalCostOfStockToBranchProductStock")]
+    partial class AddTotalCostOfStockToBranchProductStock
     {
-        protected override void BuildModel(ModelBuilder modelBuilder)
+        /// <inheritdoc />
+        protected override void BuildTargetModel(ModelBuilder modelBuilder)
         {
 #pragma warning disable 612, 618
             modelBuilder
@@ -1176,10 +1179,6 @@ namespace Forto.Infrastructure.Migrations
                         .HasColumnType("decimal(18,3)");
 
                     b.Property<decimal>("ReservedQty")
-                        .HasPrecision(18, 3)
-                        .HasColumnType("decimal(18,3)");
-
-                    b.Property<decimal>("TotalCostOfStock")
                         .HasPrecision(18, 3)
                         .HasColumnType("decimal(18,3)");
 

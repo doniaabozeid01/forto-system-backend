@@ -285,6 +285,10 @@ namespace Forto.Infrastructure.Data
                 .HasPrecision(18, 3);
 
             modelBuilder.Entity<BranchMaterialStock>()
+                .Property(x => x.TotalCostOfStock)
+                .HasPrecision(18, 3);
+
+            modelBuilder.Entity<BranchMaterialStock>()
                 .Property(x => x.ReservedQty)
                 .HasPrecision(18, 3);
 
@@ -490,6 +494,10 @@ namespace Forto.Infrastructure.Data
 
             modelBuilder.Entity<BranchProductStock>()
                 .Property(x => x.OnHandQty)
+                .HasPrecision(18, 3);
+
+            modelBuilder.Entity<BranchProductStock>()
+                .Property(x => x.TotalCostOfStock)
                 .HasPrecision(18, 3);
 
             modelBuilder.Entity<BranchProductStock>()

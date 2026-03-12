@@ -25,6 +25,7 @@ namespace Forto.Api.Controllers
             await _service.AdjustAsync(branchId, request);
             return OkResponse(new { branchId }, "Product stock adjusted");
         }
+
     }
 
 }

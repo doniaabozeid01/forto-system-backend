@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Text;
@@ -16,7 +16,7 @@ namespace Forto.Application.Abstractions.Services.Ops.Products.StockMovement
     public class ProductStockMovementService : IProductStockMovementService
     {
         private readonly IUnitOfWork _uow;
-
+           
         public ProductStockMovementService(IUnitOfWork uow) => _uow = uow;
 
         private static bool IsCashierRole(EmployeeRole role)
@@ -49,6 +49,7 @@ namespace Forto.Application.Abstractions.Services.Ops.Products.StockMovement
             var stock = (await stockRepo.FindTrackingAsync(s => s.BranchId == branchId && s.ProductId == request.ProductId))
                 .FirstOrDefault();
 
+            var isNewStock = stock == null;
             if (stock == null)
             {
                 stock = new BranchProductStock
@@ -56,14 +57,22 @@ namespace Forto.Application.Abstractions.Services.Ops.Products.StockMovement
                     BranchId = branchId,
                     ProductId = request.ProductId,
                     OnHandQty = 0,
+                    TotalCostOfStock = 0,
                     ReservedQty = 0,
                     ReorderLevel = 0
                 };
                 await stockRepo.AddAsync(stock);
             }
 
-            stock.OnHandQty += request.Qty;
-            stockRepo.Update(stock);
+            // الحساب خطوة بخطوة (متوسط مرجح متداول):
+            // (1) الرصيد الجديد = الرصيد القديم + كمية الإدخال
+            // (2) تكلفة الرصيد الجديدة = تكلفة الرصيد القديمة + (كمية الإدخال × سعر شراء الإدخال)
+            // (3) متوسط التكلفة الجديد = تكلفة الرصيد الجديدة ÷ الرصيد الجديد  ← يُحسب عند الحاجة (بيع/جرد) من TotalCostOfStock / OnHandQty
+            var newBatchCost = request.Qty * unitCost;  // كمية الإدخال × سعر شراء الإدخال
+            stock.TotalCostOfStock += newBatchCost;     // (2)
+            stock.OnHandQty += request.Qty;             // (1)
+            if (!isNewStock)
+                stockRepo.Update(stock);
 
             await moveRepo.AddAsync(new ProductMovement
             {
@@ -78,10 +87,17 @@ namespace Forto.Application.Abstractions.Services.Ops.Products.StockMovement
                 Notes = request.Notes
             });
 
-            // ✅ لو بعت unitCost، حدّث تكلفة المنتج الحالية
-            if (request.UnitCost.HasValue)
+            // التكلفة على المنتج = المتوسط المرجح الجديد
+            if (stock.OnHandQty > 0)
             {
-                product.CostPerUnit = request.UnitCost.Value;
+                product.CostPerUnit = stock.TotalCostOfStock / stock.OnHandQty;
+                productRepo.Update(product);
+            }
+
+            // سعر البيع: لو مُدخل في الطلب نحدّث، لو مش مبعوت نتركه كما هو
+            if (request.SalePrice.HasValue)
+            {
+                product.SalePrice = request.SalePrice.Value;
                 productRepo.Update(product);
             }
 
@@ -187,6 +203,7 @@ namespace Forto.Application.Abstractions.Services.Ops.Products.StockMovement
                     BranchId = branchId,
                     ProductId = request.ProductId,
                     OnHandQty = 0,
+                    TotalCostOfStock = 0,
                     ReservedQty = 0,
                     ReorderLevel = 0
                 };
@@ -198,34 +215,32 @@ namespace Forto.Application.Abstractions.Services.Ops.Products.StockMovement
                 throw new BusinessException("PhysicalOnHandQty cannot be less than ReservedQty", 409);
 
             var occurred = request.OccurredAt ?? DateTime.UtcNow;
-
-            // =========================
-            // Monthly average cost from IN movements
-            // =========================
-            // Convert to month window (UTC-based)
-            var monthStart = new DateTime(occurred.Year, occurred.Month, 1, 0, 0, 0, DateTimeKind.Utc);
-            var nextMonthStart = monthStart.AddMonths(1);
-
-            var inMoves = await moveRepo.FindAsync(m =>
-                m.BranchId == branchId &&
-                m.ProductId == request.ProductId &&
-                m.MovementType == ProductMovementType.In &&
-                m.OccurredAt >= monthStart &&
-                m.OccurredAt < nextMonthStart);
-
-            var totalInQty = inMoves.Sum(m => m.Qty);
-            var totalInCost = inMoves.Sum(m => m.TotalCost);
-
-            decimal unitCostForAdjust;
-            if (totalInQty > 0)
-                unitCostForAdjust = totalInCost / totalInQty;   // ✅ monthly avg
-            else
-                unitCostForAdjust = product.CostPerUnit;         // fallback
-
-            // =========================
-            // Apply adjust on stock
-            // =========================
             var diff = request.PhysicalOnHandQty - stock.OnHandQty; // ممكن + أو -
+
+            // تكلفة الوحدة للحركة: عند النقص نستخدم المتوسط المرجح الحالي؛ عند الزيادة متوسط إدخالات الشهر أو تكلفة المنتج
+            decimal unitCostForAdjust;
+            if (diff < 0 && stock.OnHandQty > 0)
+            {
+                unitCostForAdjust = stock.TotalCostOfStock / stock.OnHandQty;
+            }
+            else
+            {
+                var monthStart = new DateTime(occurred.Year, occurred.Month, 1, 0, 0, 0, DateTimeKind.Utc);
+                var nextMonthStart = monthStart.AddMonths(1);
+                var inMoves = await moveRepo.FindAsync(m =>
+                    m.BranchId == branchId &&
+                    m.ProductId == request.ProductId &&
+                    m.MovementType == ProductMovementType.In &&
+                    m.OccurredAt >= monthStart &&
+                    m.OccurredAt < nextMonthStart);
+                var totalInQty = inMoves.Sum(m => m.Qty);
+                var totalInCost = inMoves.Sum(m => m.TotalCost);
+                unitCostForAdjust = totalInQty > 0 ? totalInCost / totalInQty : product.CostPerUnit;
+            }
+
+            // تحديث إجمالي تكلفة الرصيد (المتوسط المرجح المتداول)
+            stock.TotalCostOfStock += diff * unitCostForAdjust;
+            if (stock.TotalCostOfStock < 0) stock.TotalCostOfStock = 0;
             stock.OnHandQty = request.PhysicalOnHandQty;
             stockRepo.Update(stock);
 
