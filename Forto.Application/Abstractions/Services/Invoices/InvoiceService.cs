@@ -3775,7 +3775,7 @@ namespace Forto.Application.Abstractions.Services.Invoices
 
 
 
-        private const decimal DefaultVatRate = 0.14m;
+        private const decimal DefaultVatRate = 0m;
 
         private static void RecalcInvoiceTotals(Invoice inv, decimal subTotal)
         {

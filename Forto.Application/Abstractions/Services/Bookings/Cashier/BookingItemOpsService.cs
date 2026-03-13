@@ -638,7 +638,7 @@ namespace Forto.Application.Abstractions.Services.Bookings.Cashier
                 throw new BusinessException("Not allowed", 403);
         }
 
-        private const decimal DefaultVatRate = 0.14m;
+        private const decimal DefaultVatRate = 0m;
 
         private static void RecalcInvoiceTotals(Invoice inv, decimal subTotal)
         {

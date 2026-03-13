@@ -35,7 +35,7 @@ namespace Forto.Domain.Entities.Billings
         public Client? Client { get; set; }         // optional navigation
         public string? CustomerPhone { get; set; }  // snapshot
         public string? CustomerName { get; set; }   // snapshot
-        public decimal TaxRate { get; set; } = 0.14m; // 14%
+        public decimal TaxRate { get; set; } = 0m; // 14%
         public decimal TaxAmount { get; set; }       // محسوبة
 
         /// <summary>سبب طلب الحذف من الكاشير.</summary>

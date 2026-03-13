@@ -992,7 +992,7 @@ namespace Forto.Application.Abstractions.Services.Bookings.Cashier.checkout
             }
         }
 
-        private const decimal DefaultVatRate = 0.14m;
+        private const decimal DefaultVatRate = 0m;
 
         private static void RecalcInvoiceTotals(Invoice inv, decimal subTotal)
         {
